@@ -61,7 +61,7 @@ function makeObject<T extends Record<string, Type<any>>>(name: string, props: T)
 
             return lines.join("\n")
         },
-        [IS_OBJECT]: true,
+        [Type.IS_OBJECT]: true,
         props
     })
 }
@@ -71,6 +71,12 @@ function extendType<I extends Type<T>, T>(values: Omit<I, "as" | "definition">):
 }
 
 export namespace Type {
+    export const IS_ARRAY = Symbol("isArray")
+    export const IS_RECORD = Symbol("isRecord")
+    export const IS_STRING_UNION = Symbol("isRecord")
+    export const IS_OBJECT = Symbol("isObject")
+    export const IS_NULLABLE = Symbol("isNullable")
+
     export interface ArrayType<T> extends Type<T[]> {
         [IS_ARRAY]: true
         type: Type<T>
@@ -81,8 +87,8 @@ export namespace Type {
         type: Type<T>
     }
 
-    export interface EnumType<T> extends Type<T> {
-        [IS_ENUM]: true
+    export interface StringUnionType<T> extends Type<T> {
+        [IS_STRING_UNION]: true
         entries: string[]
     }
 
@@ -100,19 +106,11 @@ export namespace Type {
     export type ResolveObjectType<T extends Record<string, Type<any>>> = {
         [P in keyof T]: GetTypeFromTypeWrapper<T[P]>
     }
-}
 
-const IS_ARRAY = Symbol("isArray")
-const IS_RECORD = Symbol("isRecord")
-const IS_ENUM = Symbol("isRecord")
-const IS_OBJECT = Symbol("isObject")
-const IS_NULLABLE = Symbol("isNullable")
-
-export const Type = {
-    number: makePrimitive<number>("number", { default: 0 }),
-    string: makePrimitive<string>("string", { default: "" }),
-    boolean: makePrimitive<boolean>("boolean", { default: false }),
-    array: <T>(type: Type<T>) => extendType<Type.ArrayType<T>, T[]>({
+    export const number = makePrimitive<number>("number", { default: 0 })
+    export const string = makePrimitive<string>("string", { default: "" })
+    export const boolean = makePrimitive<boolean>("boolean", { default: false })
+    export const array = <T>(type: Type<T>) => extendType<Type.ArrayType<T>, T[]>({
         name: type.name + "[]",
         default: () => [],
         getDefinition(indent) {
@@ -120,8 +118,9 @@ export const Type = {
         },
         [IS_ARRAY]: true,
         type
-    }),
-    record: <T>(type: Type<T>) => extendType<Type.RecordType<T>, Record<string, T>>({
+    })
+
+    export const record = <T>(type: Type<T>) => extendType<Type.RecordType<T>, Record<string, T>>({
         name: type.name + "[:]",
         default: () => ({}),
         getDefinition(indent) {
@@ -129,23 +128,27 @@ export const Type = {
         },
         [IS_RECORD]: true,
         type
-    }),
-    enum<T extends string[]>(...entries: T) {
+    })
+
+    export const stringUnion = <T extends string[]>(...entries: T) => {
         const entriesLookup = new Set(entries)
 
-        return extendType<Type.EnumType<T[number]>, T[number]>({
+        return extendType<Type.StringUnionType<T[number]>, T[number]>({
             name: entries.join(" | "),
             getDefinition() { return this.name },
             default: () => entries[0],
-            [IS_ENUM]: true,
+            [IS_STRING_UNION]: true,
             entries
         })
-    },
-    interface: makeObject,
-    object: <T extends Record<string, Type<any>>>(props: T) => {
+    }
+
+    export const namedType = makeObject
+
+    export const object = <T extends Record<string, Type<any>>>(props: T) => {
         return makeObject("__anon", props)
-    },
-    nullable: <T>(type: Type<T>) => extendType<Type.NullableType<T>, T | null>({
+    }
+
+    export const nullable = <T>(type: Type<T>) => extendType<Type.NullableType<T>, T | null>({
         name: type.name + "?",
         default: () => null,
         getDefinition(indent) {
@@ -154,4 +157,5 @@ export const Type = {
         [IS_NULLABLE]: true,
         base: type
     })
+
 }

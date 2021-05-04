@@ -11,7 +11,7 @@ export namespace Struct {
     export type TypedStruct<T extends Type.ObjectType<any>> = Omit<T, "default"> & StructStatics<T>
 
     export function define<T extends Record<string, Type<any>>>(name: string, props: T): TypedStruct<Type.ObjectType<T>> {
-        const objectType = Type.interface(name, props)
+        const objectType = Type.namedType(name, props)
 
         class StructInstance extends StructBase {
             constructor(source: Type.ResolveObjectType<T>) {
