@@ -40,7 +40,7 @@ function makeObject<T extends Record<string, Type<any>>>(name: string, props: T)
     return extendType<Type.ObjectType<T>, Type.ResolveObjectType<T>>({
         name,
         default: () => {
-            return {} as any
+            return Object.fromEntries(propList.map(([key, value]) => ([key, value.default()]))) as any
         },
         getDefinition(indent) {
             if (!isAnon && indent != "") {

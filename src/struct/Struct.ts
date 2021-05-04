@@ -3,9 +3,12 @@ import { Type } from "./TypeBuilder"
 export namespace Struct {
     export class StructBase { }
 
-    export type TypedStruct<T extends Type.ObjectType<any>> = {
+    interface StructStatics<T extends Type.ObjectType<any>> {
         new(source: Type.ResolveObjectType<T["props"]>): StructBase & Type.ResolveObjectType<T["props"]>
-    } & T
+        default<T extends { new(...args: any): any }>(this: T): InstanceType<T>
+    }
+
+    export type TypedStruct<T extends Type.ObjectType<any>> = Omit<T, "default"> & StructStatics<T>
 
     export function define<T extends Record<string, Type<any>>>(name: string, props: T): TypedStruct<Type.ObjectType<T>> {
         const objectType = Type.interface(name, props)
@@ -18,6 +21,16 @@ export namespace Struct {
         }
 
         for (const key of [...Object.getOwnPropertyNames(objectType), ...Object.getOwnPropertySymbols(objectType)]) {
+            if (key == "default") {
+                Object.defineProperty(StructInstance, key, {
+                    get() {
+                        return () => new this(objectType.default())
+                    }
+                })
+
+                continue
+            }
+
             Object.defineProperty(StructInstance, key, {
                 get() {
                     return (objectType as any)[key]
