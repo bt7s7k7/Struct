@@ -1,4 +1,4 @@
-import { Type } from "./TypeBuilder"
+import { Type } from "./Type"
 
 export namespace Struct {
     export class StructBase { }

@@ -1,5 +1,5 @@
 import { Struct } from "../struct/Struct"
-import { Type } from "../struct/TypeBuilder"
+import { Type } from "../struct/Type"
 
 class Test extends Struct.define("Test", {
     name: Type.string,
