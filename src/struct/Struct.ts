@@ -1,0 +1,31 @@
+import { Type } from "./TypeBuilder"
+
+export namespace Struct {
+    export class StructBase { }
+
+    export type TypedStruct<T extends Type.ObjectType<any>> = {
+        new(source: Type.ResolveObjectType<T["props"]>): StructBase & Type.ResolveObjectType<T["props"]>
+    } & T
+
+    export function define<T extends Record<string, Type<any>>>(name: string, props: T): TypedStruct<Type.ObjectType<T>> {
+        const objectType = Type.interface(name, props)
+
+        class StructInstance extends StructBase {
+            constructor(source: Type.ResolveObjectType<T>) {
+                super()
+                Object.assign(this, source)
+            }
+        }
+
+        for (const key of [...Object.getOwnPropertyNames(objectType), ...Object.getOwnPropertySymbols(objectType)]) {
+            Object.defineProperty(StructInstance, key, {
+                get() {
+                    return (objectType as any)[key]
+                }
+            })
+        }
+
+        return StructInstance as TypedStruct<Type.ObjectType<T>>
+
+    }
+}
