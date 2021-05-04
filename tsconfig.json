@@ -1,0 +1,20 @@
+{
+    "compilerOptions": {
+        "incremental": true,
+        "target": "es6",
+        "sourceMap": true,
+        "strict": true,
+        "lib": [
+            "ES2020",
+            "dom",
+            "dom.iterable"
+        ],
+        "module": "CommonJS",
+        "outDir": "build",
+        "preserveSymlinks": true
+    },
+    "include": [
+        "src",
+        "test"
+    ]
+}
