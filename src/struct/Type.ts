@@ -20,7 +20,8 @@ function makePrimitive<T>(type: string, options: {
     return makeType<T>({
         name: type,
         default: () => options.default,
-        getDefinition: () => type
+        getDefinition: () => type,
+        serialize: v => v
     })
 }
 
@@ -30,6 +31,7 @@ export interface Type<T> {
     getDefinition(indent: string): string
     default(): T
     as<R>(typeFactory: (type: Type<T>) => R): R
+    serialize(source: T): any
 }
 
 function makeObject<T extends Record<string, Type<any>>>(name: string, props: T) {
@@ -61,8 +63,17 @@ function makeObject<T extends Record<string, Type<any>>>(name: string, props: T)
 
             return lines.join("\n")
         },
-        [Type.IS_OBJECT]: true,
-        props
+        serialize(source) {
+            const ret: Record<string, any> = {}
+
+            for (const [key, value] of propList) {
+                SerializationError.catch(key, () => ret[key] = value.serialize(source[key]))
+            }
+
+            return ret
+        },
+        [IS_OBJECT]: true,
+        props, propList
     })
 }
 
@@ -70,12 +81,60 @@ function extendType<I extends Type<T>, T>(values: Omit<I, "as" | "definition">):
     return makeType<T>(values) as I
 }
 
+const IS_ARRAY = Symbol("isArray")
+const IS_RECORD = Symbol("isRecord")
+const IS_STRING_UNION = Symbol("isRecord")
+const IS_OBJECT = Symbol("isObject")
+const IS_NULLABLE = Symbol("isNullable")
+
+export interface TypeValuePair {
+    type: Type<any>
+    value: any
+}
+
+export class SerializationError extends Error {
+    public appendPath: (path: string) => void
+
+    public path = ""
+
+    constructor(
+        message: string
+    ) {
+        super("__MSG")
+
+        const oldMessage = this.message
+        const oldStack = this.stack ?? ""
+
+        this.appendPath = (newPath) => {
+            this.path = `${newPath}.${this.path}`
+            const newMessage = `Invalid type at ${this.path} : ${message}`
+            this.message = oldMessage.replace(/__MSG/, newMessage)
+            this.stack = oldStack.replace(/__MSG/, newMessage)
+        }
+
+        this.appendPath(this.path)
+    }
+
+    public static catch<T>(path: string, thunk: () => T): T {
+        try {
+            return thunk()
+        } catch (err) {
+            if (err instanceof SerializationError) {
+                err.appendPath(path)
+            }
+
+            throw err
+        }
+    }
+}
+
 export namespace Type {
-    export const IS_ARRAY = Symbol("isArray")
-    export const IS_RECORD = Symbol("isRecord")
-    export const IS_STRING_UNION = Symbol("isRecord")
-    export const IS_OBJECT = Symbol("isObject")
-    export const IS_NULLABLE = Symbol("isNullable")
+
+    export const isArray = (type: Type<any>): type is ArrayType<any> => IS_ARRAY in type
+    export const isRecord = (type: Type<any>): type is RecordType<any> => IS_RECORD in type
+    export const isStringUnion = (type: Type<any>): type is StringUnionType<any> => IS_STRING_UNION in type
+    export const isObject = (type: Type<any>): type is ObjectType<any> => IS_OBJECT in type
+    export const isNullable = (type: Type<any>): type is NullableType<any> => IS_NULLABLE in type
 
     export interface ArrayType<T> extends Type<T[]> {
         [IS_ARRAY]: true
@@ -95,6 +154,7 @@ export namespace Type {
     export interface ObjectType<T extends Record<string, Type<any>>> extends Type<ResolveObjectType<T>> {
         [IS_OBJECT]: true
         props: T
+        propList: [string, Type<any>][]
     }
 
     export interface NullableType<T> extends Type<T | null> {
@@ -116,6 +176,16 @@ export namespace Type {
         getDefinition(indent) {
             return type.getDefinition(indent) + "[]"
         },
+        serialize(source) {
+            const ret: any[] = []
+
+            for (let i = 0, len = source.length; i < len; i++) {
+                const entry = source[i]
+                SerializationError.catch(`[${i}]`, () => ret.push(type.serialize(entry)))
+            }
+
+            return ret
+        },
         [IS_ARRAY]: true,
         type
     })
@@ -125,6 +195,15 @@ export namespace Type {
         default: () => ({}),
         getDefinition(indent) {
             return type.getDefinition(indent) + "[:]"
+        },
+        serialize(source) {
+            const ret: Record<string, any> = {}
+
+            for (const [key, value] of Object.entries(source)) {
+                SerializationError.catch(key, () => ret[key](type.serialize(value)))
+            }
+
+            return ret
         },
         [IS_RECORD]: true,
         type
@@ -137,6 +216,7 @@ export namespace Type {
             name: entries.join(" | "),
             getDefinition() { return this.name },
             default: () => entries[0],
+            serialize: v => v,
             [IS_STRING_UNION]: true,
             entries
         })
@@ -154,8 +234,8 @@ export namespace Type {
         getDefinition(indent) {
             return type.getDefinition(indent) + "?"
         },
+        serialize: v => v,
         [IS_NULLABLE]: true,
         base: type
     })
-
 }

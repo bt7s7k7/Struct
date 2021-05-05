@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 import { Struct } from "../struct/Struct"
 import { Type } from "../struct/Type"
 
@@ -11,7 +12,6 @@ class Test extends Struct.define("Test", {
     }).as(Type.record)
 }) { }
 
-// eslint-disable-next-line no-console
 console.log(Test.definition)
-// eslint-disable-next-line no-console
 console.log(Test.default())
+console.log(Test.default().serialize())
