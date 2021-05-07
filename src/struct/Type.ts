@@ -21,7 +21,11 @@ function makePrimitive<T>(type: string, options: {
         name: type,
         default: () => options.default,
         getDefinition: () => type,
-        serialize: v => v
+        serialize: v => v,
+        deserialize(source) {
+            if (typeof source != type) throw new SerializationError("Expected " + this.getDefinition(""))
+            return source
+        }
     })
 }
 
@@ -32,6 +36,7 @@ export interface Type<T> {
     default(): T
     as<R>(typeFactory: (type: Type<T>) => R): R
     serialize(source: T): any
+    deserialize(source: any): T
 }
 
 function makeObject<T extends Record<string, Type<any>>>(name: string, props: T) {
@@ -72,6 +77,17 @@ function makeObject<T extends Record<string, Type<any>>>(name: string, props: T)
 
             return ret
         },
+        deserialize(source) {
+            const ret: Record<string, any> = {}
+
+            if (!source || typeof source != "object" || source instanceof Array) throw new SerializationError("Expected " + this.getDefinition(""))
+
+            for (const [key, value] of propList) {
+                SerializationError.catch(key, () => ret[key] = value.deserialize(source[key]))
+            }
+
+            return ret as Type.ResolveObjectType<T>
+        },
         [IS_OBJECT]: true,
         props, propList
     })
@@ -105,14 +121,18 @@ export class SerializationError extends Error {
         const oldMessage = this.message
         const oldStack = this.stack ?? ""
 
-        this.appendPath = (newPath) => {
-            this.path = `${newPath}.${this.path}`
-            const newMessage = `Invalid type at ${this.path} : ${message}`
+        const setPath = (newPath: string) => {
+            const newMessage = `Invalid type at .${this.path} : ${message}`
             this.message = oldMessage.replace(/__MSG/, newMessage)
             this.stack = oldStack.replace(/__MSG/, newMessage)
         }
 
-        this.appendPath(this.path)
+        this.appendPath = (newPath) => {
+            this.path = `${newPath}${this.path ? `.${this.path}` : this.path}`
+            setPath(newPath)
+        }
+
+        setPath(this.path)
     }
 
     public static catch<T>(path: string, thunk: () => T): T {
@@ -186,6 +206,18 @@ export namespace Type {
 
             return ret
         },
+        deserialize(source) {
+            const ret: any[] = []
+
+            if (!(source instanceof Array)) throw new SerializationError("Expected " + this.getDefinition(""))
+
+            for (let i = 0, len = source.length; i < len; i++) {
+                const entry = source[i]
+                SerializationError.catch(`[${i}]`, () => ret.push(type.deserialize(entry)))
+            }
+
+            return ret
+        },
         [IS_ARRAY]: true,
         type
     })
@@ -205,6 +237,17 @@ export namespace Type {
 
             return ret
         },
+        deserialize(source) {
+            const ret: Record<string, any> = {}
+
+            if (!source || typeof source != "object" || source instanceof Array) throw new SerializationError("Expected " + this.getDefinition(""))
+
+            for (const [key, value] of Object.entries(source)) {
+                SerializationError.catch(key, () => ret[key](type.serialize(value as any)))
+            }
+
+            return ret
+        },
         [IS_RECORD]: true,
         type
     })
@@ -218,6 +261,11 @@ export namespace Type {
             default: () => entries[0],
             serialize: v => v,
             [IS_STRING_UNION]: true,
+            deserialize(source) {
+                if (typeof source != "string" || !entriesLookup.has(source)) throw new SerializationError("Expected " + this.getDefinition(""))
+
+                return source
+            },
             entries
         })
     }
@@ -234,7 +282,14 @@ export namespace Type {
         getDefinition(indent) {
             return type.getDefinition(indent) + "?"
         },
-        serialize: v => v,
+        serialize(source) {
+            if (source == null) return null
+            else return type.serialize(source)
+        },
+        deserialize(source) {
+            if (source == null) return null
+            else return type.deserialize(source)
+        },
         [IS_NULLABLE]: true,
         base: type
     })

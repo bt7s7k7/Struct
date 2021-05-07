@@ -15,3 +15,10 @@ class Test extends Struct.define("Test", {
 console.log(Test.definition)
 console.log(Test.default())
 console.log(Test.default().serialize())
+
+console.log(Test.deserialize({
+    name: "",
+    height: 0,
+    nicknames: [],
+    homes: {}
+}))

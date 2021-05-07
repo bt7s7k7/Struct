@@ -10,9 +10,10 @@ export namespace Struct {
     interface StructStatics<T extends Type.ObjectType<any>> {
         new(source: Type.ResolveObjectType<T["props"]>): StructBase & Type.ResolveObjectType<T["props"]>
         default<T extends { new(...args: any): any }>(this: T): InstanceType<T>
+        deserialize<T extends { new(...args: any): any }>(this: T, source: any): InstanceType<T>
     }
 
-    export type TypedStruct<T extends Type.ObjectType<any>> = Omit<T, "default" | "serialize"> & StructStatics<T>
+    export type TypedStruct<T extends Type.ObjectType<any>> = Omit<T, "default" | "serialize" | "deserialize"> & StructStatics<T>
 
     export function define<T extends Record<string, Type<any>>>(name: string, props: T): TypedStruct<Type.ObjectType<T>> {
         const objectType = Type.namedType(name, props)
