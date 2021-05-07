@@ -22,3 +22,5 @@ console.log(Test.deserialize({
     nicknames: [],
     homes: {}
 }))
+
+type x = Struct.BaseType<typeof Test>
