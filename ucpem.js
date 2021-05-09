@@ -2,4 +2,4 @@
 
 const { project } = require("ucpem")
 
-project.prefix("src").res("app")
+project.prefix("src").res("struct")
