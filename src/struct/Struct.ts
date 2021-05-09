@@ -11,6 +11,7 @@ export namespace Struct {
         new(source: Type.ResolveObjectType<T["props"]>): StructBase & Type.ResolveObjectType<T["props"]>
         default<T extends { new(...args: any): any }>(this: T): InstanceType<T>
         deserialize<T extends { new(...args: any): any }>(this: T, source: any): InstanceType<T>
+        ref<T extends { new(...args: any): any }>(this: T): Type<InstanceType<T>>
         readonly baseType: T
     }
 
@@ -39,6 +40,18 @@ export namespace Struct {
                 continue
             }
 
+            if (key == "deserialize") {
+                Object.defineProperty(StructInstance, key, {
+                    get() {
+                        return function (this: any, source: any) {
+                            return new this(objectType.deserialize(source))
+                        }
+                    }
+                })
+
+                continue
+            }
+
             Object.defineProperty(StructInstance, key, {
                 get() {
                     return (objectType as any)[key]
@@ -46,7 +59,13 @@ export namespace Struct {
             })
         }
 
-        return StructInstance as TypedStruct<Type.ObjectType<T>>
+        const ret = StructInstance as TypedStruct<Type.ObjectType<T>>
+
+        ret.ref = function () {
+            return this as any
+        }
+
+        return ret
     }
 
     export type BaseType<T extends Omit<StructStatics<any>, "">> = T extends { baseType: infer U } ? U : never

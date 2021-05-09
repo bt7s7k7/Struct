@@ -23,4 +23,10 @@ console.log(Test.deserialize({
     homes: {}
 }))
 
+class Deriv extends Struct.define("Deriv", {
+    test: Test.ref()
+}) { }
+
+console.log(Deriv.deserialize(Deriv.default().serialize()))
+
 type x = Struct.BaseType<typeof Test>
