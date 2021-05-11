@@ -60,6 +60,7 @@ export namespace StructSyncContract {
     export type StructControllerInstance<T extends { new(...args: any): any }, A extends Record<string, ActionType<any, any>>> = InstanceType<T> & {
         impl(impl: StructSyncContract.ActionFunctions<A>): StructControllerInstance<T, A>["impl"]
         runAction<K extends keyof A>(name: K, argument: Parameters<ActionFunctions<A>[K]>[0]): ReturnType<ActionFunctions<A>[K]>
+        mutate<T>(this: T, thunk: (v: T) => void): Promise<void>
     } & IDisposable
 
     export type StructControllerClass<T extends { new(...args: any): any }, A extends Record<string, ActionType<any, any>>> = Pick<T, keyof T> & {

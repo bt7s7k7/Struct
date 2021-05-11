@@ -53,11 +53,12 @@ void (async () => {
     class PlaylistProxy extends PlaylistContract.defineProxy() { }
     class PlaylistController extends PlaylistContract.defineController() {
         public impl = super.impl({
-            async removeTrack({ index }) {
-
+            removeTrack: async ({ index }) => {
+                await this.mutate(v => v.tracks.splice(index, 1))
             }
         })
     }
+
     const playlistController = PlaylistController.default()
 
     // eslint-disable-next-line
