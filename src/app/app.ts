@@ -1,8 +1,14 @@
 /* eslint-disable no-console */
+import { IDProvider } from "../dependencyInjection/commonServices/IDProvider"
+import { MessageBridge } from "../dependencyInjection/commonServices/MessageBridge"
+import { DIContext } from "../dependencyInjection/DIContext"
 import { Struct } from "../struct/Struct"
 import { Type } from "../struct/Type"
 import { ActionType } from "../structSync/ActionType"
+import { StructSyncClientService } from "../structSync/StructSyncClientService"
 import { StructSyncContract } from "../structSync/StructSyncContract"
+import { StructSyncServerService } from "../structSync/StructSyncServerService"
+
 
 void (async () => {
     class Test extends Struct.define("Test", {
@@ -34,6 +40,13 @@ void (async () => {
 
     type _1 = Struct.BaseType<typeof Test>
 
+    const context = new DIContext()
+
+    context.provide(IDProvider, () => new IDProvider.Incremental())
+    context.provide(MessageBridge, () => new MessageBridge.Dummy())
+    context.provide(StructSyncClientService, () => new StructSyncClientService())
+    context.provide(StructSyncServerService, () => new StructSyncServerService())
+
     class Track extends Struct.define("Track", {
         name: Type.string,
         artist: Type.string,
@@ -54,21 +67,37 @@ void (async () => {
     class PlaylistController extends PlaylistContract.defineController() {
         public impl = super.impl({
             removeTrack: async ({ index }) => {
+                console.log("Removing track", index)
                 await this.mutate(v => v.tracks.splice(index, 1))
             }
         })
     }
 
-    const playlistController = PlaylistController.default()
+    const playlistController = context.instantiate(() => new PlaylistController({
+        icon: "icon_url", name: "playlist_name", tracks: [
+            new Track({
+                name: "track_1",
+                artist: "artist_1",
+                icon: "icon_1"
+            }),
+            new Track({
+                name: "track_2",
+                artist: "artist_2",
+                icon: "icon_2"
+            }),
+            new Track({
+                name: "track_3",
+                artist: "artist_3",
+                icon: "icon_3"
+            }),
+        ]
+    }).register())
 
-    // eslint-disable-next-line
-    if (![]) {
-        const playlistProxy = await PlaylistProxy.make()
+    const playlistProxy = await PlaylistProxy.make(context)
 
-        console.log(playlistProxy.tracks)
+    console.log(playlistProxy.tracks)
 
-        await playlistProxy.removeTrack({ index: 1 })
+    await playlistProxy.removeTrack({ index: 1 })
 
-        console.log(playlistProxy.tracks)
-    }
+    console.log(playlistProxy.tracks)
 })().catch(err => console.error(err))
