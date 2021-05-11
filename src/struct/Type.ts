@@ -15,7 +15,8 @@ function makeType<T>(values: Omit<Type<any>, "as" | "definition">): Type<T> {
 }
 
 function makePrimitive<T>(type: string, options: {
-    default: T
+    default: T,
+    check?: (v: any) => boolean
 }) {
     return makeType<T>({
         name: type,
@@ -23,7 +24,7 @@ function makePrimitive<T>(type: string, options: {
         getDefinition: () => type,
         serialize: v => v,
         deserialize(source) {
-            if (typeof source != type) throw new SerializationError("Expected " + this.getDefinition(""))
+            if (options.check?.(source) ?? typeof source != type) throw new SerializationError("Expected " + this.getDefinition(""))
             return source
         }
     })
@@ -190,6 +191,8 @@ export namespace Type {
     export const number = makePrimitive<number>("number", { default: 0 })
     export const string = makePrimitive<string>("string", { default: "" })
     export const boolean = makePrimitive<boolean>("boolean", { default: false })
+    export const empty = makePrimitive<void>("empty", { default: null as unknown as void, check: v => v == null })
+
     export const array = <T>(type: Type<T>) => extendType<Type.ArrayType<T>, T[]>({
         name: type.name + "[]",
         default: () => [],
