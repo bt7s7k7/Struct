@@ -1,15 +1,15 @@
 import { MessageBridge } from "../dependencyInjection/commonServices/MessageBridge"
 import { DIContext } from "../dependencyInjection/DIContext"
 import { DIService } from "../dependencyInjection/DIService"
-import { StructSyncContract } from "./StructSyncContract"
+import { StructProxy } from "./StructSyncContract"
 import { StructSyncMessages } from "./StructSyncMessages"
 
-export class StructSyncClientService extends DIService.define() {
-    public register(controller: StructSyncContract.StructProxyInstance<any, any>) {
+export class StructSyncClient extends DIService.define() {
+    public register(controller: StructProxy) {
 
     }
 
-    public unregister(controller: StructSyncContract.StructProxyInstance<any, any>) {
+    public unregister(controller: StructProxy) {
 
     }
 

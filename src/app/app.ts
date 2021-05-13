@@ -5,9 +5,9 @@ import { DIContext } from "../dependencyInjection/DIContext"
 import { Struct } from "../struct/Struct"
 import { Type } from "../struct/Type"
 import { ActionType } from "../structSync/ActionType"
-import { StructSyncClientService } from "../structSync/StructSyncClientService"
+import { StructSyncClient } from "../structSync/StructSyncClient"
 import { StructSyncContract } from "../structSync/StructSyncContract"
-import { StructSyncServerService } from "../structSync/StructSyncServerService"
+import { StructSyncServer } from "../structSync/StructSyncServer"
 
 
 void (async () => {
@@ -44,8 +44,8 @@ void (async () => {
 
     context.provide(IDProvider, () => new IDProvider.Incremental())
     context.provide(MessageBridge, () => new MessageBridge.Dummy())
-    context.provide(StructSyncClientService, () => new StructSyncClientService())
-    context.provide(StructSyncServerService, () => new StructSyncServerService())
+    context.provide(StructSyncClient, "default")
+    context.provide(StructSyncServer, "default")
 
     class Track extends Struct.define("Track", {
         name: Type.string,

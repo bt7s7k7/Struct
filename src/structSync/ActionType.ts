@@ -13,4 +13,8 @@ export namespace ActionType {
 
     export type ArgumentType<T extends ActionType<any, any>> = T extends ActionType<Type<infer U>, any> ? U : never
     export type ResultType<T extends ActionType<any, any>> = T extends ActionType<any, Type<infer U>> ? U : never
+
+    export type Functions<T extends Record<string, ActionType<any, any>>> = {
+        [P in keyof T]: (arg: ActionType.ArgumentType<T[P]>) => Promise<ActionType.ResultType<T[P]>>
+    }
 }
