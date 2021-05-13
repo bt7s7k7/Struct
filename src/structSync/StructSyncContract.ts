@@ -89,7 +89,7 @@ export namespace StructSyncContract {
                         const mutations: StructSyncMessages.AnyMutateMessage[] = []
                         const targetController = makeFullID((this as any).id, name)
 
-                        const makeProxy = (object: any, type: Type<any>, path: string[]) => {
+                        const makeProxy = (object: any, type: Type<any>, path: string[]): any => {
                             if (!Type.isArray(type) && !Type.isObject(type)) throw new Error("Cannot mutate a type that is not an object or array")
 
                             return new Proxy(object, {
@@ -107,6 +107,27 @@ export namespace StructSyncContract {
                                         path, key
                                     })
                                     return true
+                                },
+                                get(target, key, receiver) {
+                                    if (typeof key == "symbol") throw new Error("Cannon mutate a symbol indexed property")
+
+                                    if (Type.isArray(type)) {
+                                        const func = ({
+                                            splice(start: number, deleteCount: number, ...items: any[]) {
+                                                mutations.push({
+                                                    type: "mut_splice",
+                                                    deleteCount, path,
+                                                    target: targetController,
+                                                    index: start,
+                                                    items: type.serialize(items)
+                                                })
+                                            }
+                                        } as Partial<any[]>)[key as any]
+
+                                        if (func) return func
+                                    }
+
+                                    return makeProxy(Reflect.get(target, key, receiver), Type.isObject(type) ? type.props[key] : type.type, [...path, key])
                                 }
                             })
                         }

@@ -111,4 +111,8 @@ void (async () => {
     await playlistController.mutate(v => v.name = "new_name")
 
     console.log("Name:", [playlistProxy.name])
+
+    console.log("Tracks:", playlistProxy.tracks)
+    await playlistController.mutate(v => v.tracks[0].name = "new_name")
+    console.log("Tracks:", playlistProxy.tracks)
 })().catch(err => console.error(err))

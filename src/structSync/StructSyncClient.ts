@@ -68,6 +68,9 @@ export class StructSyncClient extends DIService.define() {
                         if (msg.type == "mut_assign") {
                             const valueType = Type.isObject(type) ? type.props[msg.key] : type.type
                             receiver[msg.key] = valueType.deserialize(msg.value)
+                        } else if (msg.type == "mut_splice") {
+                            if (!Type.isArray(type)) throw new Error("Unexpected splice on not array type")
+                            receiver.splice(msg.index, msg.deleteCount, ...type.deserialize(msg.items))
                         } else throw new Error(`Unknown msg type ${JSON.stringify((msg as any).type)}`)
                     })
                 } else throw new Error(`Unknown msg type ${JSON.stringify((msg as any).type)}`)
