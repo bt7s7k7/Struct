@@ -96,7 +96,7 @@ export namespace StructSyncContract {
                                 set(target, key, value, receiver) {
                                     if (typeof key == "symbol") throw new Error("Cannon mutate a symbol indexed property")
 
-                                    Reflect.set(target, key, value, receiver)
+                                    if (!Reflect.set(target, key, value, receiver)) return false
 
                                     const serializedValue = Type.isArray(type) ? type.type.serialize(value) : type.props[key].serialize(value)
 
@@ -106,6 +106,20 @@ export namespace StructSyncContract {
                                         value: serializedValue,
                                         path, key
                                     })
+
+                                    return true
+                                },
+                                deleteProperty(target, key) {
+                                    if (typeof key == "symbol") throw new Error("Cannon mutate a symbol indexed property")
+
+                                    if (!Reflect.deleteProperty(target, key)) return false
+
+                                    mutations.push({
+                                        type: "mut_delete",
+                                        target: targetController,
+                                        path, key
+                                    })
+
                                     return true
                                 },
                                 get(target, key, receiver) {
