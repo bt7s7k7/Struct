@@ -154,31 +154,31 @@ export namespace Type {
     export const isArray = (type: Type<any>): type is ArrayType<any> => IS_ARRAY in type
     export const isRecord = (type: Type<any>): type is RecordType<any> => IS_RECORD in type
     export const isStringUnion = (type: Type<any>): type is StringUnionType<any> => IS_STRING_UNION in type
-    export const isObject = (type: Type<any>): type is ObjectType<any> => IS_OBJECT in type
+    export const isObject = (type: Type<any>): type is ObjectType => IS_OBJECT in type
     export const isNullable = (type: Type<any>): type is NullableType<any> => IS_NULLABLE in type
 
-    export interface ArrayType<T> extends Type<T[]> {
+    export interface ArrayType<T = any> extends Type<T[]> {
         [IS_ARRAY]: true
         type: Type<T>
     }
 
-    export interface RecordType<T> extends Type<Record<string, T>> {
+    export interface RecordType<T = any> extends Type<Record<string, T>> {
         [IS_RECORD]: true
         type: Type<T>
     }
 
-    export interface StringUnionType<T> extends Type<T> {
+    export interface StringUnionType<T = string> extends Type<T> {
         [IS_STRING_UNION]: true
         entries: string[]
     }
 
-    export interface ObjectType<T extends Record<string, Type<any>>> extends Type<ResolveObjectType<T>> {
+    export interface ObjectType<T extends Record<string, Type<any>> = Record<string, Type<any>>> extends Type<ResolveObjectType<T>> {
         [IS_OBJECT]: true
         props: T
         propList: [string, Type<any>][]
     }
 
-    export interface NullableType<T> extends Type<T | null> {
+    export interface NullableType<T = any> extends Type<T | null> {
         [IS_NULLABLE]: true
         base: Type<T>
     }

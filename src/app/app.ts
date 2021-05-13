@@ -98,9 +98,17 @@ void (async () => {
 
     const playlistProxy = await PlaylistProxy.make(context)
 
+    playlistProxy.onMutate.add(null, msg => console.log(msg))
+
     console.log(playlistProxy.tracks)
 
     await playlistProxy.removeTrack({ index: 1 })
 
     console.log(playlistProxy.tracks)
+
+    console.log("Name:", [playlistProxy.name])
+
+    await playlistController.mutate(v => v.name = "new_name")
+
+    console.log("Name:", [playlistProxy.name])
 })().catch(err => console.error(err))

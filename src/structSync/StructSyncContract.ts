@@ -1,9 +1,11 @@
 import { DIContext } from "../dependencyInjection/DIContext"
 import { DISPOSE, disposeObject, IDisposable } from "../eventLib/Disposable"
+import { EventEmitter } from "../eventLib/EventEmitter"
 import { Struct } from "../struct/Struct"
 import { Type } from "../struct/Type"
 import { ActionType } from "./ActionType"
 import { StructSyncClient } from "./StructSyncClient"
+import { StructSyncMessages } from "./StructSyncMessages"
 import { StructSyncServer } from "./StructSyncServer"
 
 const BADGE = Symbol("badge")
@@ -37,10 +39,15 @@ export namespace StructSyncContract {
                 const Proxy = class extends (base as unknown as { new(...args: any[]): StructProxy }) {
                     public [SERVICE] = DIContext.current.inject(StructSyncClient)
 
-                    public [DISPOSE]() { disposeObject(this) }
+                    public [DISPOSE]() {
+                        disposeObject(this)
+                        this[SERVICE].unregister(makeFullID((this as any).id, name), this)
+                    }
 
                     constructor(...args: any[]) {
                         super(...args)
+
+                        this.onMutate = new EventEmitter<StructSyncMessages.AnyMutateMessage>()
 
                         for (const [key, action] of actionsList) {
                             this[key] = async (arg: any) => {
@@ -78,9 +85,35 @@ export namespace StructSyncContract {
                         return this.impl
                     }
 
-                    public async mutate() {
-                        // eslint-disable-next-line no-console
-                        console.warn("Mutating not yet implemented")
+                    public async mutate(thunk: (proxy: any) => void) {
+                        const mutations: StructSyncMessages.AnyMutateMessage[] = []
+                        const targetController = makeFullID((this as any).id, name)
+
+                        const makeProxy = (object: any, type: Type<any>, path: string[]) => {
+                            if (!Type.isArray(type) && !Type.isObject(type)) throw new Error("Cannot mutate a type that is not an object or array")
+
+                            return new Proxy(object, {
+                                set(target, key, value, receiver) {
+                                    if (typeof key == "symbol") throw new Error("Cannon mutate a symbol indexed property")
+
+                                    Reflect.set(target, key, value, receiver)
+
+                                    const serializedValue = Type.isArray(type) ? type.type.serialize(value) : type.props[key].serialize(value)
+
+                                    mutations.push({
+                                        type: "mut_assign",
+                                        target: targetController,
+                                        value: serializedValue,
+                                        path, key
+                                    })
+                                    return true
+                                }
+                            })
+                        }
+
+                        thunk(makeProxy(this, base.baseType, []))
+
+                        if (this[SERVER]) mutations.forEach(v => this[SERVER]!.notifyMutation(v))
                     }
 
                     public register() {
@@ -115,7 +148,11 @@ export namespace StructSyncContract {
     }
 }
 
-export type StructProxy<T extends { new(...args: any): any } = { new(): Struct.StructBase } & Type<any>, A extends Record<string, ActionType<any, any>> = Record<string, ActionType<any, any>>> = InstanceType<T> & ActionType.Functions<A> & IDisposable
+export type StructProxy<T extends { new(...args: any): any } = { new(): Struct.StructBase } & Type<any>, A extends Record<string, ActionType<any, any>> = Record<string, ActionType<any, any>>> =
+    InstanceType<T> &
+    ActionType.Functions<A> &
+    IDisposable &
+    { onMutate: EventEmitter<StructSyncMessages.AnyMutateMessage> }
 
 export type StructController<T extends { new(...args: any): any } = { new(): Struct.StructBase } & Type<any>, A extends Record<string, ActionType<any, any>> = Record<string, ActionType<any, any>>> = InstanceType<T> & {
     impl(impl: ActionType.Functions<A>): StructController<T, A>["impl"]

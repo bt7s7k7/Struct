@@ -25,6 +25,7 @@ export namespace StructSyncMessages {
     export interface AssignMutateMessage extends MutateMessageBase {
         type: "mut_assign"
         value: any
+        key: string
     }
 
     export interface SpliceMutateMessage extends MutateMessageBase {
@@ -39,6 +40,7 @@ export namespace StructSyncMessages {
         key: string
     }
 
-    export type AnyProxyMessage = AssignMutateMessage | SpliceMutateMessage | DeleteMutateMessage
+    export type AnyMutateMessage = AssignMutateMessage | SpliceMutateMessage | DeleteMutateMessage
+    export type AnyProxyMessage = AnyMutateMessage
     export type AnyControllerMessage = ActionCallMessage | FindControllerMessage
 }

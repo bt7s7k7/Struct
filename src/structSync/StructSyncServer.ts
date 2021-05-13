@@ -1,6 +1,7 @@
 import { DIService } from "../dependencyInjection/DIService"
 import { StructController } from "./StructSyncContract"
 import { StructSyncMessages } from "./StructSyncMessages"
+import { StructSyncSession } from "./StructSyncSession"
 
 export class StructSyncServer extends DIService.define() {
     public register(name: string, controller: StructController) {
@@ -10,6 +11,15 @@ export class StructSyncServer extends DIService.define() {
 
     public unregister(name: string) {
         delete this.controllers[name]
+    }
+
+    public attachSession(session: StructSyncSession, remove?: "remove") {
+        if (remove) this.sessions.delete(session)
+        else this.sessions.add(session)
+    }
+
+    public notifyMutation(mutation: StructSyncMessages.AnyMutateMessage) {
+        this.sessions.forEach(v => v.notifyMutation(mutation))
     }
 
     public async sendMessage(controller: StructController, message: StructSyncMessages.AnyProxyMessage): Promise<void> {
@@ -23,6 +33,7 @@ export class StructSyncServer extends DIService.define() {
     }
 
     protected controllers: Record<string, StructController> = {}
+    protected sessions = new Set<StructSyncSession>()
 
     constructor() {
         super()

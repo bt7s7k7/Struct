@@ -1,13 +1,17 @@
 import { Type } from "./Type"
 
 export namespace Struct {
+    export function getBaseType(struct: StructBase): Type.ObjectType {
+        return (struct.constructor as StructStatics).baseType
+    }
+
     export class StructBase {
         serialize<T extends { constructor: any }>(this: T): any {
             return this.constructor.serialize(this)
         }
     }
 
-    interface StructStatics<T extends Type.ObjectType<any>> {
+    interface StructStatics<T extends Type.ObjectType = Type.ObjectType> {
         new(source: Type.ResolveObjectType<T["props"]>): StructBase & Type.ResolveObjectType<T["props"]>
         default<T extends { new(...args: any): any }>(this: T): InstanceType<T>
         deserialize<T extends { new(...args: any): any }>(this: T, source: any): InstanceType<T>
