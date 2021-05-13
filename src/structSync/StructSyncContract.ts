@@ -125,6 +125,8 @@ export namespace StructSyncContract {
                                         } as Partial<any[]>)[key as any]
 
                                         if (func) return func
+
+                                        if (key in []) throw new Error(`Unsupported array operation ${JSON.stringify(key)}`)
                                     }
 
                                     return makeProxy(Reflect.get(target, key, receiver), Type.isObject(type) ? type.props[key] : type.type, [...path, key])
