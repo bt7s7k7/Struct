@@ -1,5 +1,6 @@
 import { DIContext } from "../dependencyInjection/DIContext"
 import { DISPOSE, disposeObject, IDisposable } from "../eventLib/Disposable"
+import { Struct } from "../struct/Struct"
 import { Type } from "../struct/Type"
 import { ActionType } from "./ActionType"
 import { StructSyncClient } from "./StructSyncClient"
@@ -33,7 +34,7 @@ export namespace StructSyncContract {
         return {
             base, actions,
             defineProxy() {
-                const Proxy = class extends (base as unknown as { new(...args: any[]): any }) {
+                const Proxy = class extends (base as unknown as { new(...args: any[]): StructProxy }) {
                     public [SERVICE] = DIContext.current.inject(StructSyncClient)
 
                     public [DISPOSE]() { disposeObject(this) }
@@ -44,7 +45,7 @@ export namespace StructSyncContract {
                         for (const [key, action] of actionsList) {
                             this[key] = async (arg: any) => {
                                 const serializedArgument = (action.args as Type<any>).serialize(arg)
-                                const result = this[SERVICE].runAction(makeFullID(this.id, name), key, serializedArgument)
+                                const result = this[SERVICE].runAction(makeFullID((this as any).id, name), key, serializedArgument)
                                 return (action.result as Type<any>).deserialize(result)
                             }
                         }
@@ -58,11 +59,11 @@ export namespace StructSyncContract {
                 return Proxy as any
             },
             defineController() {
-                return class extends (base as unknown as { new(...args: any[]): any }) {
+                return class extends (base as unknown as { new(...args: any[]): StructController }) {
                     public [SERVER]: StructSyncServer | null = null
 
                     public [DISPOSE]() {
-                        this[SERVER]?.unregister(makeFullID(this.id, name))
+                        this[SERVER]?.unregister(makeFullID((this as any).id, name))
                         disposeObject(this)
                     }
 
@@ -74,18 +75,19 @@ export namespace StructSyncContract {
 
                     public impl(impls: Record<string, (argument: any) => Promise<any>>) {
                         this[ACTION_IMPLS] = impls
+                        return this.impl
                     }
 
-                    public mutate() {
+                    public async mutate() {
                         // eslint-disable-next-line no-console
                         console.warn("Mutating not yet implemented")
                     }
 
                     public register() {
                         this[SERVER] = DIContext.current.inject(StructSyncServer)
-                        this[SERVER]!.register(makeFullID(this.id, name), this)
+                        this[SERVER]!.register(makeFullID((this as any).id, name), this)
 
-                        return this
+                        return this as any
                     }
 
                     protected [ACTION_IMPLS]: Record<string, (argument: any) => Promise<any>> = {}
@@ -109,9 +111,9 @@ export namespace StructSyncContract {
     }
 }
 
-export type StructProxy<T extends { new(...args: any): any } = any, A extends Record<string, ActionType<any, any>> = any> = InstanceType<T> & ActionType.Functions<A> & IDisposable
+export type StructProxy<T extends { new(...args: any): any } = { new(): Struct.StructBase } & Type<any>, A extends Record<string, ActionType<any, any>> = Record<string, ActionType<any, any>>> = InstanceType<T> & ActionType.Functions<A> & IDisposable
 
-export type StructController<T extends { new(...args: any): any } = any, A extends Record<string, ActionType<any, any>> = any> = InstanceType<T> & {
+export type StructController<T extends { new(...args: any): any } = { new(): Struct.StructBase } & Type<any>, A extends Record<string, ActionType<any, any>> = Record<string, ActionType<any, any>>> = InstanceType<T> & {
     impl(impl: ActionType.Functions<A>): StructController<T, A>["impl"]
     runAction<K extends keyof A>(name: K, argument: Parameters<ActionType.Functions<A>[K]>[0]): ReturnType<ActionType.Functions<A>[K]>
     mutate<T>(this: T, thunk: (v: T) => void): Promise<void>
