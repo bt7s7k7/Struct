@@ -16,7 +16,8 @@ export class StructSyncClient extends DIService.define() {
     public async find(context: DIContext, name: string, ctor: any, track: boolean) {
         const data = await this.sendMessage({
             type: "find",
-            target: name
+            target: name,
+            track
         })
 
         const proxy = context.instantiate(() => ctor.deserialize(data))

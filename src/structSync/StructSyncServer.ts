@@ -1,4 +1,3 @@
-import { MessageBridge } from "../dependencyInjection/commonServices/MessageBridge"
 import { DIService } from "../dependencyInjection/DIService"
 import { StructController } from "./StructSyncContract"
 import { StructSyncMessages } from "./StructSyncMessages"
@@ -17,28 +16,15 @@ export class StructSyncServer extends DIService.define() {
 
     }
 
-    protected messageBridge = this.context.inject(MessageBridge)
+    public find(target: string): StructController {
+        const controller = this.controllers[target]
+        if (controller) return controller
+        else throw new Error(`No controller named ${JSON.stringify(target)} found`)
+    }
+
     protected controllers: Record<string, StructController> = {}
 
     constructor() {
         super()
-
-        this.messageBridge.onRequest.add(this, msg => {
-            if (msg.type == "StructSync:controller_message") {
-                msg.handle(async (msg: StructSyncMessages.AnyControllerMessage) => {
-                    if (msg.type == "find") {
-                        const controller = this.controllers[msg.target]
-                        if (controller) return controller.serialize()
-                        else throw new Error(`No controller named ${JSON.stringify(msg.target)} found`)
-                    } else if (msg.type == "action") {
-                        const controller = this.controllers[msg.target]
-                        if (controller) {
-                            return controller.runAction(msg.action, msg.argument)
-                        }
-                        else throw new Error(`No controller named ${JSON.stringify(msg.target)} found`)
-                    } else throw new Error(`Unknown msg type ${JSON.stringify((msg as any).type)}`)
-                })
-            }
-        })
     }
 }

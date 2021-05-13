@@ -19,6 +19,7 @@ export namespace StructSyncMessages {
 
     export interface FindControllerMessage extends ControllerMessageBase {
         type: "find"
+        track: boolean
     }
 
     export interface AssignMutateMessage extends MutateMessageBase {

@@ -8,6 +8,7 @@ import { ActionType } from "../structSync/ActionType"
 import { StructSyncClient } from "../structSync/StructSyncClient"
 import { StructSyncContract } from "../structSync/StructSyncContract"
 import { StructSyncServer } from "../structSync/StructSyncServer"
+import { StructSyncSession } from "../structSync/StructSyncSession"
 
 
 void (async () => {
@@ -46,6 +47,8 @@ void (async () => {
     context.provide(MessageBridge, () => new MessageBridge.Dummy())
     context.provide(StructSyncClient, "default")
     context.provide(StructSyncServer, "default")
+
+    context.instantiate(() => new StructSyncSession(context.inject(MessageBridge)))
 
     class Track extends Struct.define("Track", {
         name: Type.string,
