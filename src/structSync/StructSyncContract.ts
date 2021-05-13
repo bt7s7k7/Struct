@@ -17,7 +17,7 @@ export interface StructSyncContract<T extends { new(...args: any): any }, A exte
 
 const SERVER = Symbol("server")
 
-function makeFullID(id: string | null, name: string) {
+function makeFullID(id: string | null | undefined, name: string) {
     if (id) return `${name}::${id}`
     else return name
 }
@@ -51,7 +51,7 @@ export namespace StructSyncContract {
                         }
                     }
 
-                    public static make(context: DIContext, id: string | null, track: boolean) {
+                    public static make(context: DIContext, { id, track = true }: StructProxyFactoryOptions = {}) {
                         return context.inject(StructSyncClient).find(context, makeFullID(id, name), Proxy, track)
                     }
                 }
@@ -100,10 +100,14 @@ export namespace StructSyncContract {
         }
     }
 
+    export interface StructProxyFactoryOptions {
+        id?: string
+        track?: boolean
+    }
 
     export interface StructProxyClass<T extends { new(...args: any): any }, A extends Record<string, ActionType<any, any>>> {
         new(client: StructSyncClient, data: any): StructProxy<T, A>
-        make(context: DIContext, id?: string): Promise<StructProxy<T, A>>
+        make(context: DIContext, options?: StructProxyFactoryOptions): Promise<StructProxy<T, A>>
     }
 
     export type StructControllerClass<T extends { new(...args: any): any }, A extends Record<string, ActionType<any, any>>> = Pick<T, keyof T> & {
