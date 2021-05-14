@@ -1,11 +1,24 @@
 import { MessageBridge } from "../dependencyInjection/commonServices/MessageBridge"
 import { DIContext } from "../dependencyInjection/DIContext"
 import { DIService } from "../dependencyInjection/DIService"
+import { DISPOSE } from "../eventLib/Disposable"
+import { EventListener } from "../eventLib/EventListener"
 import { MutationUtil } from "./MutationUtil"
 import { StructProxy } from "./StructSyncContract"
 import { StructSyncMessages } from "./StructSyncMessages"
 
 export class StructSyncClient extends DIService.define() {
+
+    public [DISPOSE]() {
+        super[DISPOSE]()
+
+        this.middleware.forEach(v => v.dispose())
+    }
+
+    public use(middleware: StructSyncClient.Middleware) {
+        this.middleware.push(middleware)
+    }
+
     public register(target: string, controller: StructProxy) {
         this.tracked.add(controller)
 
@@ -40,19 +53,34 @@ export class StructSyncClient extends DIService.define() {
         })
     }
 
-    public sendMessage(message: StructSyncMessages.AnyControllerMessage) {
+    public async sendMessage(message: StructSyncMessages.AnyControllerMessage) {
+        for (const middleware of this.middleware) {
+            const ret = await middleware.options.onOutgoing?.(this, message)
+            if (ret != null) {
+                message = ret
+            }
+        }
+
         return this.messageBridge.sendRequest("StructSync:controller_message", message)
     }
 
     protected messageBridge = this.context.inject(MessageBridge)
     protected tracked = new Set<StructProxy>()
     protected trackedLookup: Record<string, Set<StructProxy>> = {}
+    protected middleware: StructSyncClient.Middleware[] = []
 
     constructor() {
         super()
 
         this.messageBridge.onRequest.add(this, event => {
             if (event.type == "StructSync:proxy_message") event.handle(async (msg: StructSyncMessages.AnyProxyMessage) => {
+                for (const middleware of this.middleware) {
+                    const ret = await middleware.options.onIncoming?.(this, msg)
+                    if (ret != null) {
+                        return ret
+                    }
+                }
+
                 if (msg.type == "mut_assign" || msg.type == "mut_delete" || msg.type == "mut_splice") {
                     const proxies = this.trackedLookup[msg.target]
                     if (proxies) proxies.forEach(proxy => {
@@ -62,5 +90,20 @@ export class StructSyncClient extends DIService.define() {
                 } else throw new Error(`Unknown msg type ${JSON.stringify((msg as any).type)}`)
             })
         })
+    }
+}
+
+export namespace StructSyncClient {
+    export class Middleware extends EventListener {
+        constructor(
+            public readonly options: MiddlewareOptions
+        ) {
+            super()
+        }
+    }
+
+    export interface MiddlewareOptions {
+        onIncoming?: (client: StructSyncClient, msg: StructSyncMessages.AnyProxyMessage) => Promise<any>
+        onOutgoing?: (client: StructSyncClient, msg: StructSyncMessages.AnyControllerMessage) => Promise<StructSyncMessages.AnyControllerMessage | void>
     }
 }

@@ -91,7 +91,9 @@ export namespace StructSyncContract {
 
                         const mutations = MutationUtil.runMutationThunk(fullName, this, base.baseType, thunk)
 
-                        if (this[SERVER]) mutations.forEach(v => this[SERVER]!.notifyMutation(v))
+                        if (this[SERVER]) for (const mutation of mutations) {
+                            await this[SERVER]!.notifyMutation(mutation)
+                        }
                     }
 
                     public register() {

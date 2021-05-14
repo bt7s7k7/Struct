@@ -69,7 +69,7 @@ describe("StructSync", () => {
 
         const playlistProxy = await PlaylistProxy.make(context)
 
-        return { PlaylistContract, PlaylistProxy, PlaylistController, playlistController, playlistProxy }
+        return { PlaylistContract, PlaylistProxy, PlaylistController, playlistController, playlistProxy, context }
     }
 
     function makeContext() {
@@ -136,6 +136,35 @@ describe("StructSync", () => {
                 await playlistController.mutate(v => v.tracks[0].name = "new_name")
             })
             expect(playlistProxy.tracks[0].name).to.equal("new_name")
+        })
+
+        it("Should be able to use middleware", async () => {
+            const { playlistController, playlistProxy, context } = await makeParticipants()
+
+            const TOKEN = "35d959e6"
+
+            context.inject(StructSyncServer).use(new StructSyncServer.Middleware({
+                async onIncoming(server, session, msg) {
+                    if ((msg as any).__token != TOKEN) throw new Error("Not authenticated")
+                }
+            }))
+
+            {
+                const error = await playlistProxy.removeTrack({ index: 1 }).catch(v => v)
+                expect(error).to.be.instanceOf(Error)
+                expect(error.message).to.equal("Server Error: Not authenticated")
+            }
+
+            context.inject(StructSyncClient).use(new StructSyncClient.Middleware({
+                async onOutgoing(client, msg) {
+                    return { ...msg, __token: TOKEN }
+                }
+            }))
+
+            {
+                const error = await playlistProxy.removeTrack({ index: 1 }).catch(v => v)
+                expect(error).not.to.be.instanceOf(Error)
+            }
         })
     })
 

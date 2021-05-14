@@ -1,9 +1,19 @@
 import { DIService } from "../dependencyInjection/DIService"
+import { DISPOSE } from "../eventLib/Disposable"
+import { EventListener } from "../eventLib/EventListener"
 import { StructController } from "./StructSyncContract"
 import { StructSyncMessages } from "./StructSyncMessages"
 import { StructSyncSession } from "./StructSyncSession"
 
 export class StructSyncServer extends DIService.define() {
+    public middleware: StructSyncServer.Middleware[] = []
+
+    public [DISPOSE]() {
+        super[DISPOSE]()
+
+        this.middleware.forEach(v => v.dispose())
+    }
+
     public register(name: string, controller: StructController) {
         if (!(name in this.controllers)) this.controllers[name] = controller
         else throw new Error(`Controller named ${JSON.stringify(name)} registered already`)
@@ -18,12 +28,10 @@ export class StructSyncServer extends DIService.define() {
         else this.sessions.add(session)
     }
 
-    public notifyMutation(mutation: StructSyncMessages.AnyMutateMessage) {
-        this.sessions.forEach(v => v.notifyMutation(mutation))
-    }
-
-    public async sendMessage(controller: StructController, message: StructSyncMessages.AnyProxyMessage): Promise<void> {
-
+    public async notifyMutation(mutation: StructSyncMessages.AnyMutateMessage) {
+        for (const session of this.sessions) {
+            await session.notifyMutation(mutation)
+        }
     }
 
     public find(target: string): StructController {
@@ -32,10 +40,29 @@ export class StructSyncServer extends DIService.define() {
         else throw new Error(`No controller named ${JSON.stringify(target)} found`)
     }
 
+    public use(middleware: StructSyncServer.Middleware) {
+        this.middleware.push(middleware)
+    }
+
     protected controllers: Record<string, StructController> = {}
     protected sessions = new Set<StructSyncSession>()
 
     constructor() {
         super()
+    }
+}
+
+export namespace StructSyncServer {
+    export class Middleware extends EventListener {
+        constructor(
+            public readonly options: MiddlewareOptions
+        ) {
+            super()
+        }
+    }
+
+    export interface MiddlewareOptions {
+        onIncoming?: (server: StructSyncServer, session: StructSyncSession, msg: StructSyncMessages.AnyControllerMessage) => Promise<any>
+        onOutgoing?: (server: StructSyncServer, session: StructSyncSession, msg: StructSyncMessages.AnyProxyMessage) => Promise<StructSyncMessages.AnyProxyMessage | void>
     }
 }
