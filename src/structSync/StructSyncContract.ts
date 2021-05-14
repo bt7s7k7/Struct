@@ -4,6 +4,7 @@ import { EventEmitter } from "../eventLib/EventEmitter"
 import { Struct } from "../struct/Struct"
 import { Type } from "../struct/Type"
 import { ActionType } from "./ActionType"
+import { MutationUtil } from "./MutationUtil"
 import { StructSyncClient } from "./StructSyncClient"
 import { StructSyncMessages } from "./StructSyncMessages"
 import { StructSyncServer } from "./StructSyncServer"
@@ -86,69 +87,9 @@ export namespace StructSyncContract {
                     }
 
                     public async mutate(thunk: (proxy: any) => void) {
-                        const mutations: StructSyncMessages.AnyMutateMessage[] = []
-                        const targetController = makeFullID((this as any).id, name)
+                        const fullName = makeFullID((this as any).id, name)
 
-                        const makeProxy = (object: any, type: Type<any>, path: string[]): any => {
-                            if (!Type.isArray(type) && !Type.isObject(type)) throw new Error("Cannot mutate a type that is not an object or array")
-
-                            return new Proxy(object, {
-                                set(target, key, value, receiver) {
-                                    if (typeof key == "symbol") throw new Error("Cannon mutate a symbol indexed property")
-
-                                    if (!Reflect.set(target, key, value, receiver)) return false
-
-                                    const serializedValue = Type.isArray(type) ? type.type.serialize(value) : type.props[key].serialize(value)
-
-                                    mutations.push({
-                                        type: "mut_assign",
-                                        target: targetController,
-                                        value: serializedValue,
-                                        path, key
-                                    })
-
-                                    return true
-                                },
-                                deleteProperty(target, key) {
-                                    if (typeof key == "symbol") throw new Error("Cannon mutate a symbol indexed property")
-
-                                    if (!Reflect.deleteProperty(target, key)) return false
-
-                                    mutations.push({
-                                        type: "mut_delete",
-                                        target: targetController,
-                                        path, key
-                                    })
-
-                                    return true
-                                },
-                                get(target, key, receiver) {
-                                    if (typeof key == "symbol") throw new Error("Cannon mutate a symbol indexed property")
-
-                                    if (Type.isArray(type)) {
-                                        const func = ({
-                                            splice(start: number, deleteCount: number, ...items: any[]) {
-                                                mutations.push({
-                                                    type: "mut_splice",
-                                                    deleteCount, path,
-                                                    target: targetController,
-                                                    index: start,
-                                                    items: type.serialize(items)
-                                                })
-                                            }
-                                        } as Partial<any[]>)[key as any]
-
-                                        if (func) return func
-
-                                        if (key in []) throw new Error(`Unsupported array operation ${JSON.stringify(key)}`)
-                                    }
-
-                                    return makeProxy(Reflect.get(target, key, receiver), Type.isObject(type) ? type.props[key] : type.type, [...path, key])
-                                }
-                            })
-                        }
-
-                        thunk(makeProxy(this, base.baseType, []))
+                        const mutations = MutationUtil.runMutationThunk(fullName, this, base.baseType, thunk)
 
                         if (this[SERVER]) mutations.forEach(v => this[SERVER]!.notifyMutation(v))
                     }

@@ -1,8 +1,7 @@
 import { MessageBridge } from "../dependencyInjection/commonServices/MessageBridge"
 import { DIContext } from "../dependencyInjection/DIContext"
 import { DIService } from "../dependencyInjection/DIService"
-import { Struct } from "../struct/Struct"
-import { Type } from "../struct/Type"
+import { MutationUtil } from "./MutationUtil"
 import { StructProxy } from "./StructSyncContract"
 import { StructSyncMessages } from "./StructSyncMessages"
 
@@ -58,20 +57,7 @@ export class StructSyncClient extends DIService.define() {
                     const proxies = this.trackedLookup[msg.target]
                     if (proxies) proxies.forEach(proxy => {
                         proxy.onMutate.emit(msg)
-                        let receiver: any = proxy
-                        let type = Struct.getBaseType(proxy) as Type.ObjectType | Type.ArrayType
-                        msg.path.forEach(prop => {
-                            receiver = receiver[prop]
-                            type = (Type.isObject(type) ? type.props[prop] : type.type) as typeof type
-                        })
-
-                        if (msg.type == "mut_assign") {
-                            const valueType = Type.isObject(type) ? type.props[msg.key] : type.type
-                            receiver[msg.key] = valueType.deserialize(msg.value)
-                        } else if (msg.type == "mut_splice") {
-                            if (!Type.isArray(type)) throw new Error("Unexpected splice on not array type")
-                            receiver.splice(msg.index, msg.deleteCount, ...type.deserialize(msg.items))
-                        } else throw new Error(`Unknown msg type ${JSON.stringify((msg as any).type)}`)
+                        MutationUtil.applyMutation(proxy, msg)
                     })
                 } else throw new Error(`Unknown msg type ${JSON.stringify((msg as any).type)}`)
             })
