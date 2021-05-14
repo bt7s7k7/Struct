@@ -52,6 +52,8 @@ export namespace MutationUtil {
                                     index: start,
                                     items: type.serialize(items)
                                 })
+
+                                target.splice(start, deleteCount, ...items)
                             }
                         } as Partial<any[]>)[key as any]
 

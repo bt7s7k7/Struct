@@ -60,7 +60,7 @@ export namespace StructSyncContract {
                     }
 
                     public static make(context: DIContext, { id, track = true }: StructProxyFactoryOptions = {}) {
-                        return context.inject(StructSyncClient).find(context, makeFullID(id, name), Proxy, track)
+                        return context.inject(StructSyncClient).find(context, makeFullID(id, name), this, track)
                     }
                 }
 

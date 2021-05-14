@@ -235,7 +235,7 @@ export namespace Type {
             const ret: Record<string, any> = {}
 
             for (const [key, value] of Object.entries(source)) {
-                SerializationError.catch(key, () => ret[key](type.serialize(value)))
+                SerializationError.catch(key, () => ret[key] = type.serialize(value))
             }
 
             return ret
@@ -246,7 +246,7 @@ export namespace Type {
             if (!source || typeof source != "object" || source instanceof Array) throw new SerializationError("Expected " + this.getDefinition(""))
 
             for (const [key, value] of Object.entries(source)) {
-                SerializationError.catch(key, () => ret[key](type.serialize(value as any)))
+                SerializationError.catch(key, () => ret[key] = type.serialize(value as any))
             }
 
             return ret
