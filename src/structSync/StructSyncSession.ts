@@ -1,6 +1,7 @@
 import { MessageBridge } from "../dependencyInjection/commonServices/MessageBridge"
 import { DIContext } from "../dependencyInjection/DIContext"
 import { DISPOSE } from "../eventLib/Disposable"
+import { EventEmitter } from "../eventLib/EventEmitter"
 import { EventListener } from "../eventLib/EventListener"
 import { StructController } from "./StructSyncContract"
 import { StructSyncMessages } from "./StructSyncMessages"
@@ -8,6 +9,7 @@ import { StructSyncServer } from "./StructSyncServer"
 
 export class StructSyncSession extends EventListener {
     public readonly server = DIContext.current.inject(StructSyncServer)
+    public readonly onError = new EventEmitter<Error>()
 
     public [DISPOSE]() {
         super[DISPOSE]()
@@ -25,8 +27,7 @@ export class StructSyncSession extends EventListener {
 
         if (mutation.target in this.tracked) {
             await this.messageBridge.sendRequest("StructSync:proxy_message", mutation).catch(err => {
-                // eslint-disable-next-line no-console
-                console.error(new Error(`Client of session ${JSON.stringify(this.sessionName)} failed to perform mutation: ${err}`))
+                this.onError.emit(new Error(`Client of session ${JSON.stringify(this.sessionName)} failed to perform mutation: ${err}`))
             })
         }
     }
