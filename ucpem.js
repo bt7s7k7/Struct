@@ -10,5 +10,6 @@ const structSync = project.prefix("src").res("structSync",
 )
 
 const structSyncExpress = project.prefix("src").res("structSyncExpress", structSync)
+const structSyncAxios = project.prefix("src").res("structSyncAxios", structSync)
 
 project.prefix("test").use(github("bt7s7k7/TestUtil").res("testUtil"))
