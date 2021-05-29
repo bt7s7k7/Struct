@@ -62,6 +62,10 @@ export namespace StructSyncContract {
                     public static make(context: DIContext, { id, track = true }: StructProxyFactoryOptions = {}) {
                         return context.inject(StructSyncClient).find(context, makeFullID(id, name), this, track)
                     }
+
+                    public static default() {
+                        return new Proxy(base.baseType.default())
+                    }
                 }
 
                 return Proxy as any
@@ -121,6 +125,7 @@ export namespace StructSyncContract {
     export interface StructProxyClass<T extends { new(...args: any): any }, A extends Record<string, ActionType<any, any>>> {
         new(client: StructSyncClient, data: any): StructProxy<T, A>
         make(context: DIContext, options?: StructProxyFactoryOptions): Promise<StructProxy<T, A>>
+        default(): StructProxy<T, A>
     }
 
     export type StructControllerClass<T extends { new(...args: any): any }, A extends Record<string, ActionType<any, any>>> = Pick<T, keyof T> & {
