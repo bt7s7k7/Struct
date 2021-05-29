@@ -57,7 +57,7 @@ export class StructSyncSession extends EventListener {
                         if (msg.track) this.tracked[msg.target] = controller
                         return controller.serialize()
                     } else if (msg.type == "action") {
-                        this.server.find(msg.target).runAction(msg.action, msg.argument)
+                        return this.server.find(msg.target).runAction(msg.action, msg.argument)
                     } else throw new Error(`Unknown msg type ${JSON.stringify((msg as any).type)}`)
                 })
             }

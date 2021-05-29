@@ -1,5 +1,4 @@
 import { Request, Response } from "express"
-import { makeRandomID } from "../comTypes/util"
 import { MessageBridge } from "../dependencyInjection/commonServices/MessageBridge"
 import { StructSyncMessages } from "../structSync/StructSyncMessages"
 import { StructSyncSession } from "../structSync/StructSyncSession"
@@ -27,7 +26,7 @@ export class StructSyncExpress extends MessageBridge {
                 }
             }
 
-            const id = makeRandomID()
+            const id = (this.nextID++).toString()
             if (req.body && typeof req.body == "object") {
                 Object.assign(data, req.body)
             }
@@ -99,6 +98,8 @@ export class StructSyncExpress extends MessageBridge {
 
         delete this.pending[message.id]
     }
+
+    protected nextID = 0;
 
     protected pending: Record<string, (v: MessageBridge.Response) => void> = {}
 }
