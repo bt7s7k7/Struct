@@ -37,6 +37,13 @@ export class StructSyncExpress extends MessageBridge {
             }
 
             if (!action) {
+                const type = target.split("::")[0]
+                if (this.options.blacklist?.find(v => type == v)) {
+                    res.status(403)
+                    res.end(`Getting content of "${type}" is blacklisted`)
+                    return
+                }
+
                 this.onMessage.emit({
                     direction: "request",
                     data: {
@@ -51,7 +58,7 @@ export class StructSyncExpress extends MessageBridge {
 
                 if (response.data) {
                     res.status(200)
-                    res.json(Object.fromEntries(Object.entries(response.data).filter(([key]) => key[0] != "_")))
+                    res.json(response.data)
                 } else {
                     res.status(404)
                     res.end(response.error)
@@ -102,4 +109,8 @@ export class StructSyncExpress extends MessageBridge {
     protected nextID = 0;
 
     protected pending: Record<string, (v: MessageBridge.Response) => void> = {}
+
+    constructor(
+        protected readonly options: { blacklist?: string[] } = {}
+    ) { super() }
 }
