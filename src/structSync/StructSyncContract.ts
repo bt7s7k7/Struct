@@ -53,7 +53,7 @@ export namespace StructSyncContract {
                         for (const [key, action] of actionsList) {
                             this[key] = async (arg: any) => {
                                 const serializedArgument = (action.args as Type<any>).serialize(arg)
-                                const result = this[SERVICE].runAction(makeFullID((this as any).id, name), key, serializedArgument)
+                                const result = await this[SERVICE].runAction(makeFullID((this as any).id, name), key, serializedArgument)
                                 return (action.result as Type<any>).deserialize(result)
                             }
                         }

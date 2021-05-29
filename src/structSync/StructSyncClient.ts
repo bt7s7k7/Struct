@@ -47,7 +47,7 @@ export class StructSyncClient extends DIService.define() {
     }
 
     public async runAction(target: string, action: string, argument: any) {
-        return this.sendMessage({
+        return await this.sendMessage({
             type: "action",
             action, argument, target
         })
@@ -61,7 +61,7 @@ export class StructSyncClient extends DIService.define() {
             }
         }
 
-        return this.messageBridge.sendRequest("StructSync:controller_message", message)
+        return await this.messageBridge.sendRequest("StructSync:controller_message", message)
     }
 
     protected messageBridge = this.context.inject(MessageBridge)
