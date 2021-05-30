@@ -296,4 +296,39 @@ export namespace Type {
         [IS_NULLABLE]: true,
         base: type
     })
+
+    export const recursive = <T extends any>(thunk: () => Type<T>): Type<T> => {
+        let instance: Type<T> | null = null
+
+        return {
+            as(f) {
+                if (!instance) instance = thunk()
+                return instance.as(f)
+            },
+            default() {
+                if (!instance) instance = thunk()
+                return instance.default()
+            },
+            get name() {
+                if (!instance) instance = thunk()
+                return instance.name
+            },
+            get definition() {
+                if (!instance) instance = thunk()
+                return instance.definition
+            },
+            deserialize(f) {
+                if (!instance) instance = thunk()
+                return instance.deserialize(f)
+            },
+            serialize(f) {
+                if (!instance) instance = thunk()
+                return instance.serialize(f)
+            },
+            getDefinition(f) {
+                if (!instance) instance = thunk()
+                return instance.getDefinition(f)
+            }
+        }
+    }
 }
