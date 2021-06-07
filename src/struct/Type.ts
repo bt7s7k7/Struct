@@ -24,7 +24,7 @@ function makePrimitive<T>(type: string, options: {
         getDefinition: () => type,
         serialize: v => v,
         deserialize(source) {
-            if (options.check?.(source) ?? typeof source != type) throw new SerializationError("Expected " + this.getDefinition(""))
+            if (options.check ? !options.check(source) : typeof source != type) throw new SerializationError("Expected " + this.getDefinition(""))
             return source
         }
     })
