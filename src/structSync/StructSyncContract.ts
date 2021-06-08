@@ -67,11 +67,16 @@ export namespace StructSyncContract {
                         this.onMutate = new EventEmitter<StructSyncMessages.AnyMutateMessage>()
 
                         for (const [key, action] of actionsList) {
-                            this[key] = async (arg: any) => {
+                            (this[key] as any) = async (arg: any) => {
                                 const serializedArgument = (action.args as Type<any>).serialize(arg)
                                 const result = await this[SERVICE].runAction(makeFullID((this as any).id, name), key, serializedArgument)
                                 return (action.result as Type<any>).deserialize(result)
                             }
+                        }
+
+                        for (const [key, eventType] of Object.entries(events)) {
+                            const emitter = new EventEmitter<any>()
+                            void ((this as any)[key] = emitter)
                         }
                     }
 
@@ -133,7 +138,7 @@ export namespace StructSyncContract {
 
                             emitter.add(null, (value) => {
                                 const serialized = (eventType.result as Type<any>).serialize(value)
-                                console.log(serialized)
+                                // TODO: Send event
                             })
                         }
                     }
@@ -172,6 +177,7 @@ export type StructProxy<
     E extends Record<string, EventType<any>> = Record<string, EventType<any>>,
     > =
     InstanceType<T> &
+    EventType.Emitters<E> &
     ActionType.Functions<A> &
     IDisposable &
     { onMutate: EventEmitter<StructSyncMessages.AnyMutateMessage> }
