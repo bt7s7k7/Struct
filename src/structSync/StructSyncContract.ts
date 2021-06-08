@@ -53,12 +53,19 @@ export namespace StructSyncContract {
         return {
             base, actions, events,
             defineProxy() {
-                const Proxy = class extends (base as unknown as { new(...args: any[]): StructProxy }) {
+                const Proxy = class extends (base as unknown as { new(...args: any[]): StructProxy<{ new(): Struct.StructBase } & Type<any>, {}, {}> }) {
                     public [SERVICE] = DIContext.current.inject(StructSyncClient)
 
                     public [DISPOSE]() {
                         disposeObject(this)
-                        this[SERVICE].unregister(makeFullID((this as any).id, name), this)
+                        this[SERVICE].unregister(makeFullID((this as any).id, name), (this as unknown as StructProxy))
+                    }
+
+                    public emitEvent(event: string, payload: any) {
+                        if (event in events) {
+                            const deserialized = (events[event].result as Type<any>).deserialize(payload)
+                            void (this as any)[event].emit(deserialized)
+                        } else throw new RangeError("Unknown event " + JSON.stringify(event))
                     }
 
                     constructor(...args: any[]) {
@@ -67,14 +74,14 @@ export namespace StructSyncContract {
                         this.onMutate = new EventEmitter<StructSyncMessages.AnyMutateMessage>()
 
                         for (const [key, action] of actionsList) {
-                            (this[key] as any) = async (arg: any) => {
+                            ((this as any)[key] as any) = async (arg: any) => {
                                 const serializedArgument = (action.args as Type<any>).serialize(arg)
                                 const result = await this[SERVICE].runAction(makeFullID((this as any).id, name), key, serializedArgument)
                                 return (action.result as Type<any>).deserialize(result)
                             }
                         }
 
-                        for (const [key, eventType] of Object.entries(events)) {
+                        for (const key of Object.keys(events)) {
                             const emitter = new EventEmitter<any>()
                             void ((this as any)[key] = emitter)
                         }
@@ -138,7 +145,15 @@ export namespace StructSyncContract {
 
                             emitter.add(null, (value) => {
                                 const serialized = (eventType.result as Type<any>).serialize(value)
-                                // TODO: Send event
+                                this[SERVER]?.emitEvent({
+                                    type: "event",
+                                    target: makeFullID((this as any).id, name),
+                                    event: key,
+                                    payload: serialized
+                                }).catch(err => {
+                                    // eslint-disable-next-line no-console
+                                    console.error(err)
+                                })
                             })
                         }
                     }
@@ -180,7 +195,10 @@ export type StructProxy<
     EventType.Emitters<E> &
     ActionType.Functions<A> &
     IDisposable &
-    { onMutate: EventEmitter<StructSyncMessages.AnyMutateMessage> }
+    {
+        onMutate: EventEmitter<StructSyncMessages.AnyMutateMessage>
+        emitEvent(event: string, payload: any): void
+    }
 
 export type StructController<
     T extends { new(...args: any): any } = { new(): Struct.StructBase } & Type<any>,

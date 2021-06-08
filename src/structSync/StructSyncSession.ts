@@ -18,18 +18,27 @@ export class StructSyncSession extends EventListener {
     }
 
     public async notifyMutation(mutation: StructSyncMessages.AnyMutateMessage) {
+        await this.sendMessage(mutation)
+    }
+
+    public async emitEvent(event: StructSyncMessages.EventMessage) {
+        await this.sendMessage(event)
+    }
+
+    protected async sendMessage(message: StructSyncMessages.AnyProxyMessage) {
         for (const middleware of this.server.middleware) {
-            const ret = await middleware.options.onOutgoing?.(this.server, this, mutation)
+            const ret = await middleware.options.onOutgoing?.(this.server, this, message)
             if (ret != null) {
-                mutation = ret
+                message = ret
             }
         }
 
-        if (mutation.target in this.tracked) {
-            await this.messageBridge.sendRequest("StructSync:proxy_message", mutation).catch(err => {
+        if (message.target in this.tracked) {
+            await this.messageBridge.sendRequest("StructSync:proxy_message", message).catch(err => {
                 this.onError.emit(new Error(`Client of session ${JSON.stringify(this.sessionName)} failed to perform mutation: ${err}`))
             })
         }
+
     }
 
     protected tracked: Record<string, StructController> = {}

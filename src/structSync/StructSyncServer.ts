@@ -34,6 +34,12 @@ export class StructSyncServer extends DIService.define() {
         }
     }
 
+    public async emitEvent(event: StructSyncMessages.EventMessage) {
+        for (const session of this.sessions) {
+            await session.emitEvent(event)
+        }
+    }
+
     public find(target: string): StructController {
         const controller = this.controllers[target]
         if (controller) return controller

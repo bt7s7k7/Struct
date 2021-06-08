@@ -87,6 +87,11 @@ export class StructSyncClient extends DIService.define() {
                         proxy.onMutate.emit(msg)
                         MutationUtil.applyMutation(proxy, msg)
                     })
+                } else if (msg.type == "event") {
+                    const proxies = this.trackedLookup[msg.target]
+                    if (proxies) proxies.forEach(proxy => {
+                        proxy.emitEvent(msg.event, msg.payload)
+                    })
                 } else throw new Error(`Unknown msg type ${JSON.stringify((msg as any).type)}`)
             })
         })

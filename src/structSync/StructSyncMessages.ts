@@ -40,7 +40,14 @@ export namespace StructSyncMessages {
         key: string
     }
 
+    export interface EventMessage extends ControllerMessageBase {
+        type: "event"
+        event: string
+        payload: any
+
+    }
+
     export type AnyMutateMessage = AssignMutateMessage | SpliceMutateMessage | DeleteMutateMessage
-    export type AnyProxyMessage = AnyMutateMessage
+    export type AnyProxyMessage = AnyMutateMessage | EventMessage
     export type AnyControllerMessage = ActionCallMessage | FindControllerMessage
 }

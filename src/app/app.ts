@@ -5,6 +5,7 @@ import { DIContext } from "../dependencyInjection/DIContext"
 import { Struct } from "../struct/Struct"
 import { Type } from "../struct/Type"
 import { ActionType } from "../structSync/ActionType"
+import { EventType } from "../structSync/EventType"
 import { StructSyncClient } from "../structSync/StructSyncClient"
 import { StructSyncContract } from "../structSync/StructSyncContract"
 import { StructSyncServer } from "../structSync/StructSyncServer"
@@ -64,6 +65,8 @@ void (async () => {
 
     const PlaylistContract = StructSyncContract.define(Playlist, {
         removeTrack: ActionType.define("removeTrack", Type.object({ index: Type.number }), Type.empty)
+    }, {
+        onTrackPromoted: EventType.define("onTrackPromoted", Track.ref())
     })
 
     class PlaylistProxy extends PlaylistContract.defineProxy() { }
@@ -115,4 +118,7 @@ void (async () => {
     console.log("Tracks:", playlistProxy.tracks)
     await playlistController.mutate(v => v.tracks[0].name = "new_name")
     console.log("Tracks:", playlistProxy.tracks)
+
+    playlistProxy.onTrackPromoted.add(null, (track) => console.log(track), true)
+    playlistController.onTrackPromoted.emit(playlistController.tracks[0])
 })().catch(err => console.error(err))
