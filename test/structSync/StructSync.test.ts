@@ -5,6 +5,7 @@ import { DIContext } from "../../src/dependencyInjection/DIContext"
 import { Struct } from "../../src/struct/Struct"
 import { Type } from "../../src/struct/Type"
 import { ActionType } from "../../src/structSync/ActionType"
+import { EventType } from "../../src/structSync/EventType"
 import { StructSyncClient } from "../../src/structSync/StructSyncClient"
 import { StructSyncContract } from "../../src/structSync/StructSyncContract"
 import { StructSyncServer } from "../../src/structSync/StructSyncServer"
@@ -83,6 +84,28 @@ describe("StructSync", () => {
         context.instantiate(() => new StructSyncSession(context.inject(MessageBridge)))
 
         return context
+    }
+
+    function makeEventParticipants() {
+        const context = new DIContext()
+
+        context.provide(IDProvider, () => new IDProvider.Incremental())
+        context.provide(MessageBridge, () => new MessageBridge.Dummy())
+        context.provide(StructSyncClient, "default")
+        context.provide(StructSyncServer, "default")
+
+        context.instantiate(() => new StructSyncSession(context.inject(MessageBridge)))
+
+        class Foo extends Struct.define("Foo", {}) { }
+
+        const FooContract = StructSyncContract.define(Foo, {}, {
+            onValue: EventType.define("onValue", Type.string)
+        })
+
+        class FooProxy extends FooContract.defineProxy() { }
+        class FooController extends FooContract.defineController() { }
+
+        return { context, FooProxy, FooController }
     }
 
     describeMember(() => StructSyncContract, () => {
@@ -165,6 +188,25 @@ describe("StructSync", () => {
                 const error = await playlistProxy.removeTrack({ index: 1 }).catch(v => v)
                 expect(error).not.to.be.instanceOf(Error)
             }
+        })
+
+        it("Should be able to emit events", async () => {
+            const { FooController, FooProxy, context } = makeEventParticipants()
+            const controller = new FooController({})
+
+            context.instantiate(() => controller.register())
+
+            const proxy = await FooProxy.make(context)
+            const emitTracker = tracker("emitTracker")
+
+            proxy.onValue.add(null, (value) => {
+                emitTracker.trigger()
+                expect(value).to.equal("Hello world!")
+            })
+
+            controller.onValue.emit("Hello world!")
+
+            emitTracker.check()
         })
     })
 
