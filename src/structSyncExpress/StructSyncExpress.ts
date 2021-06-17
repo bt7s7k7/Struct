@@ -72,7 +72,7 @@ export class StructSyncExpress extends MessageBridge {
                     data: {
                         type: "action",
                         target, action,
-                        argument: data
+                        argument: Object.keys(data).length == 0 ? null : data
                     } as StructSyncMessages.ActionCallMessage,
                     id, type: "StructSync:controller_message"
                 })
