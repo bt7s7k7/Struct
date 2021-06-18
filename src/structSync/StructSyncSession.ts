@@ -44,7 +44,7 @@ export class StructSyncSession extends EventListener {
     protected tracked: Record<string, StructController> = {}
 
     constructor(
-        public readonly messageBridge: MessageBridge,
+        public readonly messageBridge: MessageBridge = DIContext.current.inject(MessageBridge),
         public readonly sessionName = ""
     ) {
         super()
