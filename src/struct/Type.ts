@@ -331,4 +331,63 @@ export namespace Type {
             }
         }
     }
+
+    export const ctor = <T>(ctor: { new(): T }) => {
+        return makeType<T>({
+            default: () => new ctor(),
+            deserialize(source) {
+                const target = new ctor()
+
+                for (const [key, value] of Object.entries(target)) {
+                    const targetType = typeof value
+                    let sourceValue = source[key]
+                    const sourceType = typeof sourceValue
+
+                    if (targetType == "function") continue
+                    if (targetType == "bigint" && sourceType == "string") {
+                        try {
+                            source = BigInt(source)
+                        } catch {
+                            const err = new SerializationError("Expected string representation of a bigint")
+                            err.appendPath(key)
+                            throw err
+                        }
+                    }
+
+                    if (targetType == "symbol") continue
+
+                    if (sourceType != targetType && (targetType != "object" || sourceValue != null)) {
+                        const err = new SerializationError("Expected " + targetType)
+                        err.appendPath(key)
+                        throw err
+                    }
+
+                    (target as any)[key] = sourceValue
+                }
+
+                return target
+            },
+            serialize(source) {
+                const result: Record<string, any> = {}
+
+                for (let [key, value] of Object.entries(source)) {
+                    const type = typeof value
+
+                    if (type == "function") continue
+                    if (type == "symbol") continue
+                    if (type == "bigint") {
+                        value = (value as BigInt).toString()
+                    }
+
+                    result[key] = value
+                }
+
+                return result
+            },
+            getDefinition() {
+                return this.name
+            },
+            name: ctor.name
+        })
+    }
 }
