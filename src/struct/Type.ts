@@ -1,3 +1,4 @@
+import { voidNaN } from "../comTypes/util"
 
 function makeType<T>(values: Omit<Type<any>, "as" | "definition">): Type<T> {
     return Object.assign({
@@ -389,5 +390,26 @@ export namespace Type {
             },
             name: ctor.name
         })
+    }
+
+    export function defineMigrations<T extends Type<any>>(type: T, migration: { version: number, desc: string, migrate: (v: any) => any }[]) {
+        const currVersion = migration.reduce((p, v) => Math.max(p, v.version), 0)
+        const oldSerialize = type.serialize
+        type.serialize = function (source) {
+            const result = oldSerialize.apply(this, [source])
+            result["!version"] = currVersion
+        }
+
+        const oldDeserialize = type.deserialize
+        type.deserialize = function (source) {
+            const version = voidNaN(source["!version"]) ?? -1
+            const currMigrations = migration.filter(v => v.version > version).sort((a, b) => a.version - b.version)
+
+            for (const migration of currMigrations) {
+                source = migration.migrate(source)
+            }
+
+            return oldDeserialize.apply(this, [source])
+        }
     }
 }
