@@ -398,6 +398,7 @@ export namespace Type {
         type.serialize = function (source) {
             const result = oldSerialize.apply(this, [source])
             result["!version"] = currVersion
+            return result
         }
 
         const oldDeserialize = type.deserialize
