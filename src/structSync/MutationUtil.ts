@@ -7,7 +7,7 @@ export namespace MutationUtil {
         const mutations: StructSyncMessages.AnyMutateMessage[] = []
 
         const makeProxy = (object: any, type: Type<any>, path: string[]): any => {
-            if (!Type.isArray(type) && !Type.isObject(type)) throw new Error("Cannot mutate a type that is not an object or array")
+            if (!Type.isArray(type) && !Type.isObject(type) && !Type.isRecord(type)) throw new Error("Cannot mutate a type that is not an object, array or record")
 
             return new Proxy(object, {
                 set(target, key, value, receiver) {
@@ -15,7 +15,7 @@ export namespace MutationUtil {
 
                     if (!Reflect.set(target, key, value, receiver)) return false
 
-                    const serializedValue = Type.isArray(type) ? type.type.serialize(value) : type.props[key].serialize(value)
+                    const serializedValue = !Type.isObject(type) ? type.type.serialize(value) : type.props[key].serialize(value)
 
                     mutations.push({
                         type: "mut_assign",
@@ -74,12 +74,12 @@ export namespace MutationUtil {
 
     export function applyMutation(target: Struct.StructBase, mutation: StructSyncMessages.AnyMutateMessage) {
         let receiver: any = target
-        let type = Struct.getBaseType(target) as Type.ObjectType | Type.ArrayType
+        let type = Struct.getBaseType(target) as Type.ObjectType | Type.ArrayType | Type.RecordType
 
         mutation.path.forEach((prop, i) => {
             receiver = receiver[prop]
             const newType = (Type.isObject(type) ? type.props[prop] : type.type)
-            if (!newType || (!Type.isObject(newType) && !Type.isArray(newType))) throw new Error(`Invalid mutation target at .${mutation.path.slice(0, i).join(".")}`)
+            if (!newType || (!Type.isObject(newType) && !Type.isArray(newType) && !Type.isRecord(newType))) throw new Error(`Invalid mutation target at .${mutation.path.slice(0, i).join(".")}`)
             type = newType
         })
 
