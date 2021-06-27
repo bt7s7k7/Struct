@@ -89,6 +89,9 @@ export namespace MutationUtil {
         } else if (mutation.type == "mut_splice") {
             if (!Type.isArray(type)) throw new Error("Unexpected splice on not array type")
             receiver.splice(mutation.index, mutation.deleteCount, ...type.deserialize(mutation.items))
+        } else if (mutation.type == "mut_delete") {
+            if (Type.isArray(type)) throw new Error("Cannot delete property from array type")
+            delete receiver[mutation.key]
         } else throw new Error(`Unknown mutation type ${JSON.stringify((mutation as any).type)}`)
     }
 }
