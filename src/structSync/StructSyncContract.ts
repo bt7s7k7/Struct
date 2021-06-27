@@ -31,6 +31,7 @@ const SERVICE = Symbol("service")
 
 export namespace StructSyncContract {
     export const ACTION_IMPLS = Symbol("actionImpls")
+    export const INSTANCE_DECORATOR = Symbol("instanceDecorator")
 
     export function define<
         T extends { new(...args: any): any, baseType: Type<any> },
@@ -71,20 +72,24 @@ export namespace StructSyncContract {
                     constructor(...args: any[]) {
                         super(...args)
 
-                        this.onMutate = new EventEmitter<StructSyncMessages.AnyMutateMessage>()
+                        const self = new.target[INSTANCE_DECORATOR] != null ? new.target[INSTANCE_DECORATOR]!(this) : this
+
+                        self.onMutate = new EventEmitter<StructSyncMessages.AnyMutateMessage>()
 
                         for (const [key, action] of actionsList) {
-                            ((this as any)[key] as any) = async (arg: any) => {
+                            ((self as any)[key] as any) = async (arg: any) => {
                                 const serializedArgument = (action.args as Type<any>).serialize(arg)
-                                const result = await this[SERVICE].runAction(makeFullID((this as any).id, name), key, serializedArgument)
+                                const result = await self[SERVICE].runAction(makeFullID((self as any).id, name), key, serializedArgument)
                                 return (action.result as Type<any>).deserialize(result)
                             }
                         }
 
                         for (const key of Object.keys(events)) {
                             const emitter = new EventEmitter<any>()
-                            void ((this as any)[key] = emitter)
+                            void ((self as any)[key] = emitter)
                         }
+
+                        return self
                     }
 
                     public static make(context: DIContext, { id, track = true }: StructProxyFactoryOptions = {}) {
@@ -94,12 +99,14 @@ export namespace StructSyncContract {
                     public static default() {
                         return new Proxy(base.baseType.default())
                     }
+
+                    public static [INSTANCE_DECORATOR]: (<T>(instance: T) => T) | null = null
                 }
 
                 return Proxy as any
             },
             defineController() {
-                return class extends (base as unknown as { new(...args: any[]): StructController<{ new(): Struct.StructBase } & Type<any>, {}, {}> }) {
+                return class Controller extends (base as unknown as { new(...args: any[]): StructController<{ new(): Struct.StructBase } & Type<any>, {}, {}> }) {
                     public [SERVER]: StructSyncServer | null = null
 
                     public [DISPOSE]() {
@@ -139,15 +146,18 @@ export namespace StructSyncContract {
 
                     constructor(...args: any[]) {
                         super(...args)
+
+                        const self = new.target[INSTANCE_DECORATOR] != null ? new.target[INSTANCE_DECORATOR]!(this) : this
+
                         for (const [key, eventType] of Object.entries(events)) {
                             const emitter = new EventEmitter<any>()
-                            void ((this as any)[key] = emitter)
+                            void ((self as any)[key] = emitter)
 
                             emitter.add(null, (value) => {
                                 const serialized = (eventType.result as Type<any>).serialize(value)
-                                this[SERVER]?.emitEvent({
+                                self[SERVER]?.emitEvent({
                                     type: "event",
-                                    target: makeFullID((this as any).id, name),
+                                    target: makeFullID((self as any).id, name),
                                     event: key,
                                     payload: serialized
                                 }).catch(err => {
@@ -156,7 +166,11 @@ export namespace StructSyncContract {
                                 })
                             })
                         }
+
+                        return self
                     }
+
+                    public static [INSTANCE_DECORATOR]: (<T>(instance: T) => T) | null = null
                 } as any
             }
         }
@@ -184,6 +198,14 @@ export namespace StructSyncContract {
         > = Pick<T, keyof T> & {
             new(...args: ConstructorParameters<T>): StructController<T, A, E>
         }
+
+    export function addDecorator<T>(ctor: { new(...args: any): T }, decorator: (instance: T) => T) {
+        const target = ctor as unknown as { [INSTANCE_DECORATOR]: (<T>(instance: T) => T) | null }
+        if (target[INSTANCE_DECORATOR]) {
+            const oldDecorator = target[INSTANCE_DECORATOR]
+            target[INSTANCE_DECORATOR] = ((v: any) => decorator(oldDecorator!(v))) as any
+        } else target[INSTANCE_DECORATOR] = decorator as any
+    }
 }
 
 export type StructProxy<
