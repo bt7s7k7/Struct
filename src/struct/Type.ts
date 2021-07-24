@@ -1,5 +1,3 @@
-import { voidNaN } from "../comTypes/util"
-
 function makeType<T>(values: Omit<Type<any>, "as" | "definition">): Type<T> {
     return Object.assign({
         as(typeFactory) {
@@ -403,7 +401,8 @@ export namespace Type {
 
         const oldDeserialize = type.deserialize
         type.deserialize = function (source) {
-            const version = voidNaN(source["!version"]) ?? -1
+            let version = source["!version"]
+            if (isNaN(version)) version == -1
             const currMigrations = migration.filter(v => v.version > version).sort((a, b) => a.version - b.version)
 
             for (const migration of currMigrations) {
