@@ -33,12 +33,13 @@ export class StructSyncSession extends EventListener {
             }
         }
 
-        if (message.target in this.tracked) {
-            await this.messageBridge.sendRequest("StructSync:proxy_message", message).catch(err => {
-                this.onError.emit(new Error(`Client of session ${JSON.stringify(this.sessionName)} failed to perform mutation: ${err}`))
-            })
+        if (message.type != "meta") {
+            if (message.target in this.tracked) {
+                await this.messageBridge.sendRequest("StructSync:proxy_message", message).catch(err => {
+                    this.onError.emit(new Error(`Client of session ${JSON.stringify(this.sessionName)} failed to perform mutation: ${err}`))
+                })
+            }
         }
-
     }
 
     protected tracked: Record<string, StructController> = {}

@@ -46,8 +46,9 @@ export class StructSyncServer extends DIService.define() {
         else throw new Error(`No controller named ${JSON.stringify(target)} found`)
     }
 
-    public use(middleware: StructSyncServer.Middleware) {
+    public use<T extends StructSyncServer.Middleware>(middleware: T) {
         this.middleware.push(middleware)
+        return middleware
     }
 
     protected controllers: Record<string, StructController> = {}

@@ -3,6 +3,7 @@ import { DIContext } from "../dependencyInjection/DIContext"
 import { DIService } from "../dependencyInjection/DIService"
 import { DISPOSE } from "../eventLib/Disposable"
 import { EventListener } from "../eventLib/EventListener"
+import { MetaMessageType } from "./MetaMessageType"
 import { MutationUtil } from "./MutationUtil"
 import { StructProxy } from "./StructSyncContract"
 import { StructSyncMessages } from "./StructSyncMessages"
@@ -64,6 +65,11 @@ export class StructSyncClient extends DIService.define() {
         return await this.messageBridge.sendRequest("StructSync:controller_message", message)
     }
 
+    public async sendMetaMessage<K extends string, T, R>(type: MetaMessageType<K, T, R>, data: T): Promise<R> {
+        const response = await this.sendMessage({ type: "meta", name: type.name, data: type.argument.serialize(data) })
+        return type.result.deserialize(response)
+    }
+
     protected messageBridge = this.context.inject(MessageBridge)
     protected tracked = new Set<StructProxy>()
     protected trackedLookup: Record<string, Set<StructProxy>> = {}
@@ -92,6 +98,8 @@ export class StructSyncClient extends DIService.define() {
                     if (proxies) proxies.forEach(proxy => {
                         proxy.emitEvent(msg.event, msg.payload)
                     })
+                } else if (msg.type == "meta") {
+                    throw new Error(`Meta message of type ${JSON.stringify(msg.name)} not accepted`)
                 } else throw new Error(`Unknown msg type ${JSON.stringify((msg as any).type)}`)
             })
         })

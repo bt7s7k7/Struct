@@ -3,6 +3,12 @@ export namespace StructSyncMessages {
         type: string
     }
 
+    export interface MetaMessage<K extends string = string> extends MessageBase {
+        type: "meta"
+        name: K
+        data: any
+    }
+
     interface ControllerMessageBase extends MessageBase {
         target: string
     }
@@ -48,6 +54,6 @@ export namespace StructSyncMessages {
     }
 
     export type AnyMutateMessage = AssignMutateMessage | SpliceMutateMessage | DeleteMutateMessage
-    export type AnyProxyMessage = AnyMutateMessage | EventMessage
-    export type AnyControllerMessage = ActionCallMessage | FindControllerMessage
+    export type AnyProxyMessage = AnyMutateMessage | EventMessage | MetaMessage
+    export type AnyControllerMessage = ActionCallMessage | FindControllerMessage | MetaMessage
 }
