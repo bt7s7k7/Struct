@@ -187,8 +187,8 @@ export namespace StructSyncContract {
         E extends Record<string, EventType<any>>
         > {
         new(client: StructSyncClient, data: any): StructProxy<T, A, E>
-        make(context: DIContext, options?: StructProxyFactoryOptions): Promise<StructProxy<T, A, E>>
-        default(): StructProxy<T, A, E>
+        make(context: DIContext, options?: StructProxyFactoryOptions): Promise<InstanceType<this>>
+        default(): InstanceType<this>
     }
 
     export type StructControllerClass<
