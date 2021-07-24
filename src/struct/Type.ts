@@ -148,6 +148,10 @@ export class SerializationError extends Error {
     }
 }
 
+type GetTaggedUnionTypes<T extends Record<string, Type<any>>> = {
+    [P in keyof T]: Type.GetTypeFromTypeWrapper<T[P]> extends void ? { type: P } : { type: P, value: Type.GetTypeFromTypeWrapper<T[P]> }
+}[keyof T]
+
 export namespace Type {
 
     export const isArray = (type: Type<any>): type is ArrayType<any> => IS_ARRAY in type
@@ -390,6 +394,38 @@ export namespace Type {
         })
     }
 
+    export function taggedUnion<T extends Record<string, Type<any>>>(types: T) {
+        const typeList = Object.entries(types)
+
+        const getDefinition = (indent: string) => {
+            return typeList.map(v => `${JSON.stringify(v[0])} => ${v[1].getDefinition(indent)}`).join(",\n")
+        }
+
+        return makeType<GetTaggedUnionTypes<T>>({
+            default() {
+                return { type: typeList[0][0], value: typeList[0][1].default() }
+            },
+            getDefinition,
+            name: getDefinition(""),
+            deserialize(source) {
+                const parsedSource = taggedUnionWrapper.deserialize(source)
+                const target = types[parsedSource.type]
+                if (target == null) throw new SerializationError("Type " + JSON.stringify(parsedSource.type) + " not a valid tag")
+                return {
+                    type: parsedSource.type,
+                    value: target.deserialize(parsedSource.value)
+                }
+            },
+            serialize(source) {
+                const target = types[source.type]
+                return {
+                    type: source.type,
+                    value: target.serialize(source.value)
+                }
+            }
+        })
+    }
+
     export function defineMigrations<T extends Type<any>>(type: T, migration: { version: number, desc: string, migrate: (v: any) => any }[]) {
         const currVersion = migration.reduce((p, v) => Math.max(p, v.version), 0)
         const oldSerialize = type.serialize
@@ -413,3 +449,8 @@ export namespace Type {
         }
     }
 }
+
+const taggedUnionWrapper = Type.object({
+    type: Type.string,
+    value: Type.passthrough(null as any)
+})
