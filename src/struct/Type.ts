@@ -394,6 +394,22 @@ export namespace Type {
         })
     }
 
+    export function passthrough<T>(defaultValue: T) {
+        return makeType<T>({
+            default: () => defaultValue,
+            deserialize(source: any) {
+                return source
+            },
+            serialize(source: any) {
+                return source
+            },
+            getDefinition() {
+                return this.name
+            },
+            name: "passthrough"
+        })
+    }
+
     export function taggedUnion<T extends Record<string, Type<any>>>(types: T) {
         const typeList = Object.entries(types)
 
