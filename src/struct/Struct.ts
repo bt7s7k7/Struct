@@ -1,5 +1,8 @@
 import { Type } from "./Type"
 
+type NullableKeys<T> = { [K in keyof T]: null extends T[K] ? K : never }[keyof T]
+type AllowVoidIfAllNullable<T> = Exclude<keyof T, NullableKeys<T>> extends never ? T | void : T
+
 export namespace Struct {
     export function getBaseType(struct: StructBase): Type.ObjectType {
         return (struct.constructor as StructStatics).baseType
@@ -12,7 +15,7 @@ export namespace Struct {
     }
 
     interface StructStatics<T extends Type.ObjectType = Type.ObjectType> {
-        new(source: Type.ResolveObjectType<T["props"]>): StructBase & Type.ResolveObjectType<T["props"]>
+        new(source: AllowVoidIfAllNullable<Type.ResolveObjectType<T["props"]>>): StructBase & Type.ResolveObjectType<T["props"]>
         default<T extends { new(...args: any): any }>(this: T): InstanceType<T>
         deserialize<T extends { new(...args: any): any }>(this: T, source: any): InstanceType<T>
         ref<T extends { new(...args: any): any }>(this: T): Type<InstanceType<T>>
@@ -28,7 +31,7 @@ export namespace Struct {
         class StructInstance extends StructBase {
             constructor(source: Type.ResolveObjectType<T>) {
                 super()
-                Object.assign(this, source)
+                Object.assign(this, source ?? {})
             }
 
             public static readonly baseType = objectType

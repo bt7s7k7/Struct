@@ -72,7 +72,7 @@ function makeObject<T extends Record<string, Type<any>>>(name: string, props: T)
             const ret: Record<string, any> = {}
 
             for (const [key, value] of propList) {
-                SerializationError.catch(key, () => ret[key] = value.serialize(source[key]))
+                SerializationError.catch(key, () => ret[key] = value.serialize((source as any)[key]))
             }
 
             return ret
@@ -148,6 +148,12 @@ export class SerializationError extends Error {
     }
 }
 
+type NullablePartial<
+    T,
+    NK extends keyof T = { [K in keyof T]: null extends T[K] ? K : never }[keyof T],
+    NP = Partial<Pick<T, NK>> & Pick<T, Exclude<keyof T, NK>>
+    > = { [K in keyof NP]: NP[K] }
+
 type GetTaggedUnionTypes<T extends Record<string, Type<any>>> = {
     [P in keyof T]: Type.GetTypeFromTypeWrapper<T[P]> extends void ? { type: P } : { type: P, value: Type.GetTypeFromTypeWrapper<T[P]> }
 }[keyof T]
@@ -187,9 +193,9 @@ export namespace Type {
     }
 
     export type GetTypeFromTypeWrapper<T extends Type<any>> = T extends Type<infer U> ? U : never
-    export type ResolveObjectType<T extends Record<string, Type<any>>> = {
+    export type ResolveObjectType<T extends Record<string, Type<any>>> = NullablePartial<{
         [P in keyof T]: GetTypeFromTypeWrapper<T[P]>
-    }
+    }>
 
     export const number = makePrimitive<number>("number", { default: 0 })
     export const string = makePrimitive<string>("string", { default: "" })

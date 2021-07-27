@@ -6,6 +6,8 @@ export interface ActionType<A extends Type<any>, R extends Type<any>> {
     result: R
 }
 
+type NullableVoid<T> = T extends null ? null | void : T
+
 export namespace ActionType {
     export function define<A extends Type<any>, R extends Type<any>>(name: string, args: A, result: R): ActionType<A, R> {
         return { name, args, result }
@@ -15,6 +17,6 @@ export namespace ActionType {
     export type ResultType<T extends ActionType<any, any>> = T extends ActionType<any, Type<infer U>> ? U : never
 
     export type Functions<T extends Record<string, ActionType<any, any>>> = {
-        [P in keyof T]: (arg: ActionType.ArgumentType<T[P]>) => Promise<ActionType.ResultType<T[P]>>
+        [P in keyof T]: (arg: NullableVoid<ActionType.ArgumentType<T[P]>>) => Promise<ActionType.ResultType<T[P]>>
     }
 }
