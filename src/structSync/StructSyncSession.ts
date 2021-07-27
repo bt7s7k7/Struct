@@ -68,6 +68,8 @@ export class StructSyncSession extends EventListener {
                         return controller.serialize()
                     } else if (msg.type == "action") {
                         return this.server.find(msg.target).runAction(msg.action, msg.argument)
+                    } else if (msg.type == "meta") {
+                        // Ignore
                     } else throw new Error(`Unknown msg type ${JSON.stringify((msg as any).type)}`)
                 })
             }
