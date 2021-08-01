@@ -97,7 +97,7 @@ export namespace StructSyncContract {
                     }
 
                     public static default() {
-                        return new Proxy(base.baseType.default())
+                        return new this(base.baseType.default())
                     }
 
                     public static [INSTANCE_DECORATOR]: (<T>(instance: T) => T) | null = null
