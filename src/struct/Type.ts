@@ -470,6 +470,10 @@ export namespace Type {
             return oldDeserialize.apply(this, [source])
         }
     }
+
+    export function clone<T>(type: Type<T>, value: T) {
+        return type.deserialize(type.serialize(value))
+    }
 }
 
 const taggedUnionWrapper = Type.object({
