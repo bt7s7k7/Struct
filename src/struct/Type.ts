@@ -155,7 +155,7 @@ type NullablePartial<
     > = { [K in keyof NP]: NP[K] }
 
 type GetTaggedUnionTypes<T extends Record<string, Type<any>>> = {
-    [P in keyof T]: Type.GetTypeFromTypeWrapper<T[P]> extends void ? { type: P } : { type: P, value: Type.GetTypeFromTypeWrapper<T[P]> }
+    [P in keyof T]: Type.GetTypeFromTypeWrapper<T[P]> extends void ? { type: P, value?: null } : { type: P, value: Type.GetTypeFromTypeWrapper<T[P]> }
 }[keyof T]
 
 export namespace Type {
