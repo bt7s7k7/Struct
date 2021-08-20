@@ -14,7 +14,6 @@ export class StructSyncExpress extends MessageBridge {
 
             const data: Record<string, any> = {}
 
-
             const url = req.url.substr(1)
             const [pointer, query] = url.split("?")
             const [target, action] = pointer.split("/")
@@ -30,6 +29,7 @@ export class StructSyncExpress extends MessageBridge {
             if (req.body && typeof req.body == "object") {
                 Object.assign(data, req.body)
             }
+
             if (!target) {
                 res.status(400)
                 res.end("Missing target, expected `./:target`")
