@@ -113,6 +113,8 @@ export class SerializationError extends Error {
 
     public path = ""
 
+    public readonly _isClientError = true
+
     constructor(
         message: string
     ) {
