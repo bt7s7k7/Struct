@@ -16,7 +16,7 @@ export interface StructSyncContract<T extends { new(...args: any): any }, A exte
     base: T
     actions: A
     events: E
-    defineProxy(): StructSyncContract.StructProxyClass<T, A, E>
+    defineProxy(): StructSyncContract.StructProxyClass<T, A, E> & Pick<T, Extract<keyof T, "baseType">>
     defineController(): StructSyncContract.StructControllerClass<T, A, E>
 }
 
@@ -28,6 +28,14 @@ function makeFullID(id: string | null | undefined, name: string) {
 }
 
 const SERVICE = Symbol("service")
+
+export class ControllerActionNotFoundError extends Error {
+    public _isClientError = true
+
+    constructor(action: string) {
+        super(`Action ${JSON.stringify(action)} not found on controller`)
+    }
+}
 
 export namespace StructSyncContract {
     export const ACTION_IMPLS = Symbol("actionImpls")
@@ -114,10 +122,10 @@ export namespace StructSyncContract {
                         disposeObject(this)
                     }
 
-                    public runAction(name: string, argument: any): any {
+                    public runAction(name: string, argument: any, meta: StructSyncMessages.MetaHandle): any {
                         const impl = this[ACTION_IMPLS][name]
-                        if (impl) return impl((actions[name].args as Type<any>).deserialize(argument)).then(v => (actions[name].result as Type<any>).serialize(v))
-                        else return Promise.reject(new Error(`Action "${name}" not implemented`))
+                        if (impl) return impl((actions[name].args as Type<any>).deserialize(argument), meta).then(v => (actions[name].result as Type<any>).serialize(v))
+                        else return Promise.reject(new ControllerActionNotFoundError(name))
                     }
 
                     public impl(impls: Record<string, (argument: any) => Promise<any>>) {
@@ -142,7 +150,7 @@ export namespace StructSyncContract {
                         return this as any
                     }
 
-                    protected [ACTION_IMPLS]: Record<string, (argument: any) => Promise<any>> = {}
+                    protected [ACTION_IMPLS]: Record<string, (argument: any, meta: StructSyncMessages.MetaHandle) => Promise<any>> = {}
 
                     constructor(...args: any[]) {
                         super(...args)
@@ -187,8 +195,8 @@ export namespace StructSyncContract {
         E extends Record<string, EventType<any>>
         > {
         new(client: StructSyncClient, data: any): StructProxy<T, A, E>
-        make(context: DIContext, options?: StructProxyFactoryOptions): Promise<InstanceType<this>>
-        default(): InstanceType<this>
+        make<T extends new (...args: any[]) => any>(this: T, context: DIContext, options?: StructProxyFactoryOptions): Promise<InstanceType<T>>
+        default<T extends new (...args: any[]) => any>(this: T): InstanceType<T>
     }
 
     export type StructControllerClass<
@@ -199,7 +207,7 @@ export namespace StructSyncContract {
             new(...args: ConstructorParameters<T>): StructController<T, A, E>
         }
 
-    export function addDecorator<T>(ctor: { new(...args: any): T }, decorator: (instance: T) => T) {
+    export function addDecorator<T>(ctor: { new(...args: any): T }, decorator: (instance: T) => any) {
         const target = ctor as unknown as { [INSTANCE_DECORATOR]: (<T>(instance: T) => T) | null }
         if (target[INSTANCE_DECORATOR]) {
             const oldDecorator = target[INSTANCE_DECORATOR]
@@ -229,8 +237,8 @@ export type StructController<
     > = InstanceType<T> &
     EventType.Emitters<E> &
     {
-        impl(impl: ActionType.Functions<A>): StructController<T, A>["impl"]
-        runAction<K extends keyof A>(name: K, argument: Parameters<ActionType.Functions<A>[K]>[0]): ReturnType<ActionType.Functions<A>[K]>
+        impl(impl: ActionType.FunctionsImpl<A>): StructController<T, A>["impl"]
+        runAction<K extends keyof A>(name: K, argument: Parameters<ActionType.Functions<A>[K]>[0], meta: StructSyncMessages.MetaHandle): ReturnType<ActionType.Functions<A>[K]>
         mutate<T>(this: T, thunk: (v: T) => void): Promise<void>
         register<T>(this: T): T
     } & IDisposable

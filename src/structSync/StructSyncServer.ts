@@ -5,6 +5,10 @@ import { StructController } from "./StructSyncContract"
 import { StructSyncMessages } from "./StructSyncMessages"
 import { StructSyncSession } from "./StructSyncSession"
 
+export class ControllerNotFoundError extends Error {
+    public readonly _isClientError = true
+}
+
 export class StructSyncServer extends DIService.define() {
     public middleware: StructSyncServer.Middleware[] = []
 
@@ -43,10 +47,11 @@ export class StructSyncServer extends DIService.define() {
     public find(target: string): StructController {
         const controller = this.controllers[target]
         if (controller) return controller
-        else throw new Error(`No controller named ${JSON.stringify(target)} found`)
+        else throw new ControllerNotFoundError(`No controller named ${JSON.stringify(target)} found`)
     }
 
-    public use<T extends StructSyncServer.Middleware>(middleware: T) {
+    public use<T extends StructSyncServer.Middleware>(middleware: T | (() => T)) {
+        if (typeof middleware == "function") middleware = this.context.instantiate(middleware)
         this.middleware.push(middleware)
         return middleware
     }
@@ -69,7 +74,7 @@ export namespace StructSyncServer {
     }
 
     export interface MiddlewareOptions {
-        onIncoming?: (server: StructSyncServer, session: StructSyncSession, msg: StructSyncMessages.AnyControllerMessage) => Promise<any>
+        onIncoming?: (server: StructSyncServer, session: StructSyncSession, msg: StructSyncMessages.AnyControllerMessage, meta: StructSyncMessages.MetaHandle) => Promise<any>
         onOutgoing?: (server: StructSyncServer, session: StructSyncSession, msg: StructSyncMessages.AnyProxyMessage) => Promise<StructSyncMessages.AnyProxyMessage | void>
     }
 }

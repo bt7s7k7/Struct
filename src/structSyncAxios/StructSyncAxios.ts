@@ -5,8 +5,23 @@ import { StructSyncMessages } from "../structSync/StructSyncMessages"
 export class StructSyncAxios extends MessageBridge {
     public async sendMessage(message: MessageBridge.Message) {
         const structSyncMessage = message.data as StructSyncMessages.AnyControllerMessage
-        const path = structSyncMessage.type == "action" ? `${structSyncMessage.target}/${structSyncMessage.action}` : structSyncMessage.target
-        const body = structSyncMessage.type == "action" ? structSyncMessage.argument : null
+
+        const path = structSyncMessage.type == "action" ? `${structSyncMessage.target}/${structSyncMessage.action}`
+            : structSyncMessage.type == "meta" ? `__meta::${structSyncMessage.name}`
+                : structSyncMessage.target
+
+        let body = structSyncMessage.type == "action" ? structSyncMessage.argument
+            : structSyncMessage.type == "meta" ? structSyncMessage.data
+                : null
+
+        for (const key of Object.keys(structSyncMessage)) {
+            if (body == null) body = {}
+
+            if (key[0] == "_") {
+                // @ts-ignore
+                body[key] = structSyncMessage[key]
+            }
+        }
 
         const response = await axios.post(this.url + path, body)
 

@@ -55,8 +55,10 @@ export class StructSyncSession extends EventListener {
         this.messageBridge.onRequest.add(this, msg => {
             if (msg.type == "StructSync:controller_message") {
                 msg.handle(async (msg: StructSyncMessages.AnyControllerMessage) => {
+                    const metaHandle: StructSyncMessages.MetaHandle = {} as any
+
                     for (const middleware of this.server.middleware) {
-                        const ret = await middleware.options.onIncoming?.(this.server, this, msg)
+                        const ret = await middleware.options.onIncoming?.(this.server, this, msg, metaHandle)
                         if (ret != null) {
                             return ret
                         }
@@ -67,7 +69,7 @@ export class StructSyncSession extends EventListener {
                         if (msg.track) this.tracked[msg.target] = controller
                         return controller.serialize()
                     } else if (msg.type == "action") {
-                        return this.server.find(msg.target).runAction(msg.action, msg.argument)
+                        return this.server.find(msg.target).runAction(msg.action, msg.argument, metaHandle)
                     } else if (msg.type == "meta") {
                         // Ignore
                     } else throw new Error(`Unknown msg type ${JSON.stringify((msg as any).type)}`)

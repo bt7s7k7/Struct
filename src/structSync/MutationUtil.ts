@@ -43,6 +43,8 @@ export namespace MutationUtil {
                     if (typeof key == "symbol") throw new Error("Cannon mutate a symbol indexed property")
 
                     if (Type.isArray(type)) {
+                        if (key == "length") return target.length
+
                         const func = ({
                             splice(start: number, deleteCount: number, ...items: any[]) {
                                 mutations.push({
@@ -54,6 +56,9 @@ export namespace MutationUtil {
                                 })
 
                                 target.splice(start, deleteCount, ...items)
+                            },
+                            push(...items) {
+                                this.splice(this.length, 0, ...items)
                             }
                         } as Partial<any[]>)[key as any]
 

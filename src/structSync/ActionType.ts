@@ -1,4 +1,5 @@
 import { Type } from "../struct/Type"
+import { StructSyncMessages } from "./StructSyncMessages"
 
 export interface ActionType<A extends Type<any>, R extends Type<any>> {
     name: string
@@ -18,5 +19,9 @@ export namespace ActionType {
 
     export type Functions<T extends Record<string, ActionType<any, any>>> = {
         [P in keyof T]: (arg: NullableVoid<ActionType.ArgumentType<T[P]>>) => Promise<ActionType.ResultType<T[P]>>
+    }
+
+    export type FunctionsImpl<T extends Record<string, ActionType<any, any>>> = {
+        [P in keyof T]: (arg: NullableVoid<ActionType.ArgumentType<T[P]>>, meta: StructSyncMessages.MetaHandle) => Promise<ActionType.ResultType<T[P]>>
     }
 }

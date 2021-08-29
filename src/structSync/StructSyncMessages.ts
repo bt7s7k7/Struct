@@ -1,4 +1,7 @@
 export namespace StructSyncMessages {
+    declare const _metaHandle: unique symbol
+    export type MetaHandle = { [_metaHandle]: true }
+
     interface MessageBase {
         type: string
     }

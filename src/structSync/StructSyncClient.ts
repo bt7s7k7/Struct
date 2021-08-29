@@ -16,8 +16,9 @@ export class StructSyncClient extends DIService.define() {
         this.middleware.forEach(v => v.dispose())
     }
 
-    public use(middleware: StructSyncClient.Middleware) {
+    public use<T extends StructSyncClient.Middleware>(middleware: T) {
         this.middleware.push(middleware)
+        return middleware
     }
 
     public register(target: string, controller: StructProxy) {

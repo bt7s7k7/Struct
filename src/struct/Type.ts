@@ -202,7 +202,7 @@ export namespace Type {
     export const number = makePrimitive<number>("number", { default: 0 })
     export const string = makePrimitive<string>("string", { default: "" })
     export const boolean = makePrimitive<boolean>("boolean", { default: false })
-    export const empty = makePrimitive<void>("empty", { default: null as unknown as void, check: v => v == null })
+    export const empty = makePrimitive<void>("empty", { default: null as unknown as void, check: v => (v == null || v == "") })
 
     export const array = <T>(type: Type<T>) => extendType<Type.ArrayType<T>, T[]>({
         name: type.name + "[]",
