@@ -367,7 +367,7 @@ export namespace Type {
 
                     if (targetType == "symbol") continue
 
-                    if (sourceType != targetType && (targetType != "object" || sourceValue != null)) {
+                    if (sourceType != targetType && (targetType != "object" || sourceValue != null) && targetType != "undefined") {
                         const err = new SerializationError("Expected " + targetType)
                         err.appendPath(key)
                         throw err
