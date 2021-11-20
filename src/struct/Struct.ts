@@ -8,13 +8,17 @@ export namespace Struct {
         return (struct.constructor as StructStatics).baseType
     }
 
+    export function getType(struct: StructBase) {
+        return struct.constructor as StructStatics
+    }
+
     export class StructBase {
         serialize<T extends { constructor: any }>(this: T): any {
             return this.constructor.serialize(this)
         }
     }
 
-    interface StructStatics<T extends Type.ObjectType = Type.ObjectType> {
+    export interface StructStatics<T extends Type.ObjectType = Type.ObjectType> {
         new(source: AllowVoidIfAllNullable<Type.ResolveObjectType<T["props"]>>): StructBase & Type.ResolveObjectType<T["props"]>
         default<T extends { new(...args: any): any }>(this: T): InstanceType<T>
         deserialize<T extends { new(...args: any): any }>(this: T, source: any): InstanceType<T>
