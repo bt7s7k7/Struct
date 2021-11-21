@@ -4,6 +4,7 @@ export namespace StructSyncMessages {
 
     interface MessageBase {
         type: string
+        [index: `_${string}`]: any
     }
 
     export interface MetaMessage<K extends string = string> extends MessageBase {
