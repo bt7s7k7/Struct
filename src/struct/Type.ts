@@ -161,6 +161,7 @@ type GetTaggedUnionTypes<T extends Record<string, Type<any>>> = {
 }[keyof T]
 
 export namespace Type {
+    export const createType = makeType
 
     export const isArray = (type: Type<any>): type is ArrayType<any> => IS_ARRAY in type
     export const isRecord = (type: Type<any>): type is RecordType<any> => IS_RECORD in type
