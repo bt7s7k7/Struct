@@ -1,6 +1,7 @@
 import { DIContext } from "../dependencyInjection/DIContext"
 import { DISPOSE, disposeObject, IDisposable } from "../eventLib/Disposable"
 import { EventEmitter } from "../eventLib/EventEmitter"
+import { IEventListener, implementEventListener } from "../eventLib/EventListener"
 import { Struct } from "../struct/Struct"
 import { Type } from "../struct/Type"
 import { ActionType } from "./ActionType"
@@ -105,7 +106,9 @@ export namespace StructSyncContract {
                     }
 
                     public static default() {
-                        return new this(base.baseType.default())
+                        const proxy = new this(base.baseType.default())
+                        proxy[SERVICE].register(name, proxy as any)
+                        return proxy
                     }
 
                     public static [INSTANCE_DECORATOR]: (<T>(instance: T) => T) | null = null
