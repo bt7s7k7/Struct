@@ -9,6 +9,10 @@ export class ControllerNotFoundError extends Error {
     public readonly _isClientError = true
 }
 
+export class ClientError extends Error {
+    public readonly _isClientError = true
+}
+
 export class StructSyncServer extends DIService.define() {
     public middleware: StructSyncServer.Middleware[] = []
 
