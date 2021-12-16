@@ -120,6 +120,8 @@ export namespace StructSyncContract {
                 return class Controller extends (base as unknown as { new(...args: any[]): StructController<{ new(): Struct.StructBase } & Type<any>, {}, {}> }) {
                     public [SERVER]: StructSyncServer | null = null
 
+                    public getWeakRef = implementEventListener(this)
+
                     public [DISPOSE]() {
                         this[SERVER]?.unregister(makeFullID((this as any).id, name))
                         disposeObject(this)
@@ -244,4 +246,4 @@ export type StructController<
         runAction<K extends keyof A>(name: K, argument: Parameters<ActionType.Functions<A>[K]>[0], meta: StructSyncMessages.MetaHandle): ReturnType<ActionType.Functions<A>[K]>
         mutate<T>(this: T, thunk: (v: T) => void): Promise<void>
         register<T>(this: T): T
-    } & IDisposable
+    } & IEventListener
