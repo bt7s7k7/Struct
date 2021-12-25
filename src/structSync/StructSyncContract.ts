@@ -78,6 +78,17 @@ export namespace StructSyncContract {
                         } else throw new RangeError("Unknown event " + JSON.stringify(event))
                     }
 
+                    public async synchronize() {
+                        const data = await this[SERVICE].sendMessage({
+                            type: "find",
+                            target: makeFullID((this as any).id, name),
+                            track: false
+                        })
+
+                        const instance = base.baseType.deserialize(data)
+                        Object.assign(this, instance)
+                    }
+
                     constructor(...args: any[]) {
                         super(...args)
 
@@ -233,6 +244,7 @@ export type StructProxy<
     {
         onMutate: EventEmitter<StructSyncMessages.AnyMutateMessage>
         emitEvent(event: string, payload: any): void
+        synchronize(): Promise<void>
     }
 
 export type StructController<
