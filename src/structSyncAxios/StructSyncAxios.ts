@@ -42,7 +42,12 @@ export class StructSyncAxios extends MessageBridge {
         }
     }
 
+    public readonly url: string
     constructor(
-        public readonly url: string
-    ) { super() }
+        url: string
+    ) {
+        super()
+        if (url[url.length - 1] != "/") url += "/"
+        this.url = url
+    }
 }
