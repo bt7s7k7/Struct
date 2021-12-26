@@ -1,6 +1,13 @@
+import { StructSyncClient } from "./StructSyncClient"
+import { StructSyncSession } from "./StructSyncSession"
+
 export namespace StructSyncMessages {
     declare const _metaHandle: unique symbol
-    export type MetaHandle = { [_metaHandle]: true }
+    export type MetaHandle = {
+        [_metaHandle]: true
+        session: StructSyncSession
+        server: StructSyncClient
+    }
 
     interface MessageBase {
         type: string

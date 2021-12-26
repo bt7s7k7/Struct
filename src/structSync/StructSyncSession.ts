@@ -56,7 +56,10 @@ export class StructSyncSession extends EventListener {
         this.messageBridge.onRequest.add(this, msg => {
             if (msg.type == "StructSync:controller_message") {
                 msg.handle(async (msg: StructSyncMessages.AnyControllerMessage) => {
-                    const metaHandle: StructSyncMessages.MetaHandle = {} as any
+                    const metaHandle = {
+                        server: this.server,
+                        session: this
+                    } as any as StructSyncMessages.MetaHandle
 
                     for (const middleware of this.server.middleware) {
                         const ret = await middleware.options.onIncoming?.(this.server, this, msg, metaHandle)
