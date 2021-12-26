@@ -37,7 +37,9 @@ export class StructSyncSession extends EventListener {
             // Only send message if the target is tracked or if it's a singleton (does not have an id, tracked by default)
             if (message.target in this.tracked || !message.target.includes("::")) {
                 await this.messageBridge.sendRequest("StructSync:proxy_message", message).catch(err => {
-                    this.onError.emit(new Error(`Client of session ${JSON.stringify(this.sessionName)} failed to perform mutation: ${err}`))
+                    if (!err.message.includes("MessageBridge disposed")) {
+                        this.onError.emit(new Error(`Client of session ${JSON.stringify(this.sessionName)} failed to perform mutation: ${err}`))
+                    }
                 })
             }
         }
