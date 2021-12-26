@@ -37,15 +37,11 @@ export class StructSyncServer extends DIService.define() {
     }
 
     public async notifyMutation(mutation: StructSyncMessages.AnyMutateMessage) {
-        for (const session of this.sessions) {
-            await session.notifyMutation(mutation)
-        }
+        await Promise.all([...this.sessions.values()].map(session => session.notifyMutation(mutation)))
     }
 
     public async emitEvent(event: StructSyncMessages.EventMessage) {
-        for (const session of this.sessions) {
-            await session.emitEvent(event)
-        }
+        await Promise.all([...this.sessions.values()].map(session => session.emitEvent(event)))
     }
 
     public find(target: string): StructController {
