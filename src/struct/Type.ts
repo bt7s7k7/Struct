@@ -98,6 +98,8 @@ function extendType<I extends Type<T>, T>(values: Omit<I, "as" | "definition">):
 }
 
 const IS_ARRAY = Symbol("isArray")
+const IS_SET = Symbol("isArray")
+const IS_MAP = Symbol("isArray")
 const IS_RECORD = Symbol("isRecord")
 const IS_STRING_UNION = Symbol("isRecord")
 const IS_OBJECT = Symbol("isObject")
@@ -164,6 +166,8 @@ export namespace Type {
     export const createType = makeType
 
     export const isArray = (type: Type<any>): type is ArrayType<any> => IS_ARRAY in type
+    export const isSet = (type: Type<any>): type is SetType<any> => IS_SET in type
+    export const isMap = (type: Type<any>): type is MapType<any> => IS_MAP in type
     export const isRecord = (type: Type<any>): type is RecordType<any> => IS_RECORD in type
     export const isStringUnion = (type: Type<any>): type is StringUnionType<any> => IS_STRING_UNION in type
     export const isObject = (type: Type<any>): type is ObjectType => IS_OBJECT in type
@@ -171,6 +175,16 @@ export namespace Type {
 
     export interface ArrayType<T = any> extends Type<T[]> {
         [IS_ARRAY]: true
+        type: Type<T>
+    }
+
+    export interface SetType<T = any> extends Type<Set<T>> {
+        [IS_SET]: true
+        type: Type<T>
+    }
+
+    export interface MapType<T = any> extends Type<Map<string, T>> {
+        [IS_MAP]: true
         type: Type<T>
     }
 
@@ -237,6 +251,39 @@ export namespace Type {
         type
     })
 
+    export const set = <T>(type: Type<T>) => extendType<Type.SetType<T>, Set<T>>({
+        name: "Set<" + type.name + ">",
+        default: () => new Set(),
+        getDefinition(indent) {
+            return "Set<" + type.getDefinition(indent) + ">"
+        },
+        serialize(source) {
+            const ret: any[] = []
+
+            let i = 0
+            for (const entry of source.values()) {
+                SerializationError.catch(`[${i}]`, () => ret.push(type.serialize(entry)))
+                i++
+            }
+
+            return ret
+        },
+        deserialize(source) {
+            const ret = new Set<T>()
+
+            if (!(source instanceof Array)) throw new SerializationError("Expected " + this.getDefinition(""))
+
+            for (let i = 0, len = source.length; i < len; i++) {
+                const entry = source[i]
+                SerializationError.catch(`[${i}]`, () => ret.add(type.deserialize(entry)))
+            }
+
+            return ret
+        },
+        [IS_SET]: true,
+        type
+    })
+
     export const record = <T>(type: Type<T>) => extendType<Type.RecordType<T>, Record<string, T>>({
         name: type.name + "[:]",
         default: () => ({}),
@@ -264,6 +311,36 @@ export namespace Type {
             return ret
         },
         [IS_RECORD]: true,
+        type
+    })
+
+    export const map = <T>(type: Type<T>) => extendType<Type.MapType<T>, Map<string, T>>({
+        name: "Map<" + type.name + ">",
+        default: () => new Map(),
+        getDefinition(indent) {
+            return "Map<" + type.getDefinition(indent) + ">"
+        },
+        serialize(source) {
+            const ret: Record<string, any> = {}
+
+            for (const [key, value] of source) {
+                SerializationError.catch(key, () => ret[key] = type.serialize(value))
+            }
+
+            return ret
+        },
+        deserialize(source) {
+            const ret = new Map<string, T>()
+
+            if (!source || typeof source != "object" || source instanceof Array) throw new SerializationError("Expected " + this.getDefinition(""))
+
+            for (const [key, value] of Object.entries(source)) {
+                SerializationError.catch(key, () => ret.set(key, type.serialize(value as any)))
+            }
+
+            return ret
+        },
+        [IS_MAP]: true,
         type
     })
 

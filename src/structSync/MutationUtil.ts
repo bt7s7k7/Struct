@@ -2,12 +2,39 @@ import { Struct } from "../struct/Struct"
 import { Type } from "../struct/Type"
 import { StructSyncMessages } from "./StructSyncMessages"
 
+function getSetEntryAtIndex<T>(set: Set<T>, index: number) {
+    let i = 0
+
+    for (const entry of set.values()) {
+        if (i == index) return entry
+        i++
+    }
+
+    return undefined
+}
+
+function findSetEntryIndex<T>(set: Set<T>, target: T) {
+    let i = 0
+    for (const entry of set.values()) {
+        if (entry == target) return i
+        i++
+    }
+
+    return undefined
+}
+
 export namespace MutationUtil {
     export function runMutationThunk<T>(targetName: string, target: T, baseType: Type<any>, thunk: (proxy: T) => void) {
         const mutations: StructSyncMessages.AnyMutateMessage[] = []
 
         const makeProxy = (object: any, type: Type<any>, path: string[]): any => {
-            if (!Type.isArray(type) && !Type.isObject(type) && !Type.isRecord(type)) throw new Error("Cannot mutate a type that is not an object, array or record")
+            if (
+                !Type.isArray(type) &&
+                !Type.isObject(type) &&
+                !Type.isRecord(type) &&
+                !Type.isMap(type) &&
+                !Type.isSet(type)
+            ) throw new Error("Cannot mutate a type that is not an object, array, set, map or record")
 
             return new Proxy(object, {
                 set(target, key, value, receiver) {
@@ -65,6 +92,103 @@ export namespace MutationUtil {
                         if (func) return func
 
                         if (key in []) throw new Error(`Unsupported array operation ${JSON.stringify(key)}`)
+                    } else if (Type.isMap(type)) {
+                        if (key == "size") return target.size
+
+                        const func = (({
+                            set(key, value) {
+                                mutations.push({
+                                    type: "mut_assign",
+                                    path, key,
+                                    target: targetName,
+                                    value: type.type.serialize(value)
+                                })
+
+                                target.set(key, value)
+                            },
+                            get(key) {
+                                return makeProxy(target.get(key), type.type, [...path, key])
+                            },
+                            clear() {
+                                mutations.push({
+                                    type: "mut_splice",
+                                    deleteCount: -1,
+                                    index: 0,
+                                    items: [],
+                                    path,
+                                    target: targetName
+                                })
+
+                                target.clear()
+                            },
+                            delete(key) {
+                                if (!target.has(key)) return false
+                                mutations.push({
+                                    type: "mut_delete",
+                                    key, path,
+                                    target: targetName
+                                })
+
+                                target.delete(key)
+                                return true
+                            }
+                        } as Partial<Map<string, any>>) as any)[key]
+
+                        if (func) return func
+
+                        throw new Error(`Unsupported map operation ${JSON.stringify(key)}`)
+                    } else if (Type.isSet(type)) {
+                        if (key == "size") return target.size
+
+                        const func = (({
+                            add(value) {
+                                if (target.has(value)) return
+                                mutations.push({
+                                    type: "mut_splice",
+                                    deleteCount: 0,
+                                    index: 0,
+                                    items: [
+                                        type.type.serialize(value)
+                                    ],
+                                    path,
+                                    target: targetName
+                                })
+
+                                target.add(value)
+                            },
+                            clear() {
+                                mutations.push({
+                                    type: "mut_splice",
+                                    deleteCount: -1,
+                                    index: 0,
+                                    items: [],
+                                    path,
+                                    target: targetName
+                                })
+
+                                target.clear()
+                            },
+                            delete(entry) {
+                                if (!target.has(entry)) return false
+                                const index = findSetEntryIndex(target, entry)
+                                if (index == undefined) throw new Error("Didn't find entry index, even though the set has it")
+
+                                mutations.push({
+                                    type: "mut_splice",
+                                    index, path,
+                                    deleteCount: 1,
+                                    target: targetName,
+                                    items: []
+                                })
+
+                                target.delete(entry)
+                                return true
+                            }
+                        } as Partial<Set<any>>) as any)[key]
+
+                        if (func) return func
+
+                        throw new Error(`Unsupported map operation ${JSON.stringify(key)}`)
                     }
 
                     return makeProxy(Reflect.get(target, key, receiver), Type.isObject(type) ? type.props[key] : type.type, [...path, key])
@@ -89,14 +213,29 @@ export namespace MutationUtil {
         })
 
         if (mutation.type == "mut_assign") {
-            const valueType = Type.isObject(type) ? type.props[mutation.key] : type.type
-            receiver[mutation.key] = valueType.deserialize(mutation.value)
+            if (Type.isObject(type) || Type.isArray(type)) {
+                const valueType = Type.isObject(type) ? type.props[mutation.key] : type.type
+                receiver[mutation.key] = valueType.deserialize(mutation.value)
+            } else if (Type.isMap(type)) {
+                receiver.set(mutation.key, type.type.deserialize(mutation.value))
+            } throw new Error("Cannot use assign on type")
         } else if (mutation.type == "mut_splice") {
-            if (!Type.isArray(type)) throw new Error("Unexpected splice on not array type")
-            receiver.splice(mutation.index, mutation.deleteCount, ...type.deserialize(mutation.items))
+            if (Type.isArray(type)) {
+                receiver.splice(mutation.index, mutation.deleteCount, ...type.deserialize(mutation.items))
+            } else if (Type.isSet(type)) {
+                if (mutation.deleteCount == -1) receiver.clear()
+                else if (mutation.index == 0 && mutation.deleteCount == 0) receiver.add(type.deserialize(mutation.items[0]))
+                else if (mutation.deleteCount == 1) receiver.delete(getSetEntryAtIndex(receiver, mutation.index))
+                else throw new Error(`Invalid set message (index = ${mutation.index}; deleteCount = ${mutation.deleteCount})`)
+            } else if (Type.isMap(type)) {
+                receiver.clear()
+            } else throw new Error("Cannot use splice on type")
         } else if (mutation.type == "mut_delete") {
-            if (Type.isArray(type)) throw new Error("Cannot delete property from array type")
-            delete receiver[mutation.key]
+            if (Type.isObject(type)) {
+                delete receiver[mutation.key]
+            } else if (Type.isMap(type)) {
+                receiver.delete(mutation.key)
+            } else throw new Error("Cannot use splice on type")
         } else throw new Error(`Unknown mutation type ${JSON.stringify((mutation as any).type)}`)
     }
 }
