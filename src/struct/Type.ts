@@ -271,7 +271,7 @@ export namespace Type {
         const entriesLookup = new Set(entries)
 
         return extendType<Type.StringUnionType<T[number]>, T[number]>({
-            name: entries.join(" | "),
+            name: entries.join(" | "),
             getDefinition() { return this.name },
             default: () => entries[0],
             serialize: v => v,
