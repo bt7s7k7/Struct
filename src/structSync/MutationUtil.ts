@@ -107,7 +107,8 @@ export namespace MutationUtil {
                                 target.set(key, value)
                             },
                             get(key) {
-                                return makeProxy(target.get(key), type.type, [...path, key])
+                                const value = target.get(key)
+                                return makeProxy(value, type.type, [...path, key])
                             },
                             clear() {
                                 mutations.push({
@@ -203,12 +204,20 @@ export namespace MutationUtil {
 
     export function applyMutation(target: Struct.StructBase, mutation: StructSyncMessages.AnyMutateMessage) {
         let receiver: any = target
-        let type = Struct.getBaseType(target) as Type.ObjectType | Type.ArrayType | Type.RecordType
+        let type = Struct.getBaseType(target) as Type.ObjectType | Type.ArrayType | Type.RecordType | Type.MapType | Type.SetType
 
         mutation.path.forEach((prop, i) => {
-            receiver = receiver[prop]
+            receiver = Type.isMap(type) ? receiver.get(prop)
+                : Type.isSet(type) ? getSetEntryAtIndex(receiver, +prop)
+                    : receiver[prop]
             const newType = (Type.isObject(type) ? type.props[prop] : type.type)
-            if (!newType || (!Type.isObject(newType) && !Type.isArray(newType) && !Type.isRecord(newType))) throw new Error(`Invalid mutation target at .${mutation.path.slice(0, i).join(".")}`)
+            if (!newType || (
+                !Type.isObject(newType) &&
+                !Type.isArray(newType) &&
+                !Type.isRecord(newType) &&
+                !Type.isMap(newType) &&
+                !Type.isSet(newType)
+            )) throw new Error(`Invalid mutation target "${prop}" at .${mutation.path.slice(0, i).join(".")}`)
             type = newType
         })
 
@@ -218,7 +227,7 @@ export namespace MutationUtil {
                 receiver[mutation.key] = valueType.deserialize(mutation.value)
             } else if (Type.isMap(type)) {
                 receiver.set(mutation.key, type.type.deserialize(mutation.value))
-            } throw new Error("Cannot use assign on type")
+            } else throw new Error("Cannot use assign on type " + type.name)
         } else if (mutation.type == "mut_splice") {
             if (Type.isArray(type)) {
                 receiver.splice(mutation.index, mutation.deleteCount, ...type.deserialize(mutation.items))
@@ -229,13 +238,13 @@ export namespace MutationUtil {
                 else throw new Error(`Invalid set message (index = ${mutation.index}; deleteCount = ${mutation.deleteCount})`)
             } else if (Type.isMap(type)) {
                 receiver.clear()
-            } else throw new Error("Cannot use splice on type")
+            } else throw new Error("Cannot use splice on type" + type.name)
         } else if (mutation.type == "mut_delete") {
             if (Type.isObject(type)) {
                 delete receiver[mutation.key]
             } else if (Type.isMap(type)) {
                 receiver.delete(mutation.key)
-            } else throw new Error("Cannot use splice on type")
+            } else throw new Error("Cannot use delete on type" + type.name)
         } else throw new Error(`Unknown mutation type ${JSON.stringify((mutation as any).type)}`)
     }
 }
