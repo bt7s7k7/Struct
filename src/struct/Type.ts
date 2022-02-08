@@ -305,7 +305,7 @@ export namespace Type {
             if (!source || typeof source != "object" || source instanceof Array) throw new SerializationError("Expected " + this.getDefinition(""))
 
             for (const [key, value] of Object.entries(source)) {
-                SerializationError.catch(key, () => ret[key] = type.serialize(value as any))
+                SerializationError.catch(key, () => ret[key] = type.deserialize(value as any))
             }
 
             return ret
@@ -335,7 +335,7 @@ export namespace Type {
             if (!source || typeof source != "object" || source instanceof Array) throw new SerializationError("Expected " + this.getDefinition(""))
 
             for (const [key, value] of Object.entries(source)) {
-                SerializationError.catch(key, () => ret.set(key, type.serialize(value as any)))
+                SerializationError.catch(key, () => ret.set(key, type.deserialize(value as any)))
             }
 
             return ret
