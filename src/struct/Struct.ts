@@ -19,7 +19,7 @@ export namespace Struct {
     }
 
     type FilterProps<T> = Pick<T, keyof T>
-    export type StructConcept<T extends Record<string, Type<any>>> = FilterProps<Struct.TypedStruct<Type.ObjectType<T>>> & { new(source: any): Type.ResolveObjectType<T> & StructBase }
+    export type StructConcept<T extends Record<string, Type<any>> = Record<string, Type<any>>> = FilterProps<Struct.TypedStruct<Type.ObjectType<T>>> & { new(source: any): Type.ResolveObjectType<T> & StructBase }
 
     export interface StructStatics<T extends Type.ObjectType = Type.ObjectType> {
         new(source: AllowVoidIfAllNullable<Type.ResolveObjectType<T["props"]>>): StructBase & Type.ResolveObjectType<T["props"]>
