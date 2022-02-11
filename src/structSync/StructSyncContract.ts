@@ -159,8 +159,8 @@ export namespace StructSyncContract {
                         }
                     }
 
-                    public register() {
-                        this[SERVER] = DIContext.current.inject(StructSyncServer)
+                    public register(server?: StructSyncServer) {
+                        this[SERVER] = server ?? DIContext.current.inject(StructSyncServer)
                         this[SERVER]!.register(makeFullID((this as any).id, name), this as any)
 
                         return this as any
@@ -257,5 +257,5 @@ export type StructController<
         impl(impl: ActionType.FunctionsImpl<A>): StructController<T, A>["impl"]
         runAction<K extends keyof A>(name: K, argument: Parameters<ActionType.Functions<A>[K]>[0], meta: StructSyncMessages.MetaHandle): ReturnType<ActionType.Functions<A>[K]>
         mutate<T>(this: T, thunk: (v: T) => void): Promise<void>
-        register<T>(this: T): T
+        register<T>(this: T, server?: StructSyncServer): T
     } & IEventListener
