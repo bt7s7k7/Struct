@@ -34,7 +34,9 @@ export namespace MutationUtil {
                 !Type.isRecord(type) &&
                 !Type.isMap(type) &&
                 !Type.isSet(type)
-            ) throw new Error("Cannot mutate a type that is not an object, array, set, map or record")
+            ) {
+                throw new Error("Cannot mutate a type that is not an object, array, set, map or record, " + type.name)
+            }
 
             return new Proxy(object, {
                 set(target, key, value, receiver) {
@@ -222,7 +224,7 @@ export namespace MutationUtil {
         })
 
         if (mutation.type == "mut_assign") {
-            if (Type.isObject(type) || Type.isArray(type)) {
+            if (Type.isObject(type) || Type.isArray(type) || Type.isRecord(type)) {
                 const valueType = Type.isObject(type) ? type.props[mutation.key] : type.type
                 receiver[mutation.key] = valueType.deserialize(mutation.value)
             } else if (Type.isMap(type)) {
@@ -240,11 +242,11 @@ export namespace MutationUtil {
                 receiver.clear()
             } else throw new Error("Cannot use splice on type" + type.name)
         } else if (mutation.type == "mut_delete") {
-            if (Type.isObject(type)) {
+            if (Type.isObject(type) || Type.isRecord(type)) {
                 delete receiver[mutation.key]
             } else if (Type.isMap(type)) {
                 receiver.delete(mutation.key)
-            } else throw new Error("Cannot use delete on type" + type.name)
+            } else throw new Error("Cannot use delete on type " + type.name)
         } else throw new Error(`Unknown mutation type ${JSON.stringify((mutation as any).type)}`)
     }
 }
