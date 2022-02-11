@@ -1,4 +1,4 @@
-import axios from "axios"
+import axios, { AxiosError } from "axios"
 import { MessageBridge } from "../dependencyInjection/commonServices/MessageBridge"
 import { StructSyncMessages } from "../structSync/StructSyncMessages"
 
@@ -23,13 +23,26 @@ export class StructSyncAxios extends MessageBridge {
             }
         }
 
-        const response = await axios.post(this.url + path, body)
+        let result = await axios.post(this.url + path, body).catch(v => v as AxiosError)
 
-        if (response.status == 200) {
+        if ("message" in result) {
+            if (result.response) {
+                result = result.response
+            } else {
+                this.onMessage.emit({
+                    direction: "response",
+                    id: message.id,
+                    data: null,
+                    error: result.message
+                })
+                return
+            }
+        }
+        if (result.status == 200) {
             this.onMessage.emit({
                 direction: "response",
                 id: message.id,
-                data: response.data,
+                data: result.data,
                 error: null
             })
         } else {
@@ -37,7 +50,7 @@ export class StructSyncAxios extends MessageBridge {
                 direction: "response",
                 id: message.id,
                 data: null,
-                error: response.data
+                error: result.data
             })
         }
     }
