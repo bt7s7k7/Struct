@@ -540,7 +540,7 @@ export namespace Type {
         const oldDeserialize = type.deserialize
         type.deserialize = function (source) {
             let version = source["!version"]
-            if (isNaN(version)) version == -1
+            if (isNaN(version)) version = -1
             const currMigrations = migration.filter(v => v.version > version).sort((a, b) => a.version - b.version)
 
             for (const migration of currMigrations) {
