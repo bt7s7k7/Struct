@@ -386,6 +386,12 @@ export namespace Type {
         base: type
     })
 
+    export const partial = <T>(type: Type<T>) => {
+        if (!isObject(type)) throw new Error("Partial type must be derived from object")
+
+        return Type.namedType("Partial<" + type.name + ">", Object.fromEntries(type.propList.map(([key, value]) => [key, isNullable(value) ? value : Type.nullable(value)]))) as Type<Partial<T>>
+    }
+
     export const recursive = <T extends any>(thunk: () => Type<T>): Type<T> => {
         let instance: Type<T> | null = null
 
