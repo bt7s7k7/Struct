@@ -27,7 +27,9 @@ export namespace MutationUtil {
     export function runMutationThunk<T>(targetName: string, target: T, baseType: Type<any>, thunk: (proxy: T) => void) {
         const mutations: StructSyncMessages.AnyMutateMessage[] = []
 
-        const makeProxy = (object: any, type: Type<any>, path: string[]): any => {
+        const makeProxy = (object: any, _type: Type<any>, path: string[]): any => {
+            const type = Type.isNullable(_type) ? _type.base : _type
+
             if (
                 !Type.isArray(type) &&
                 !Type.isObject(type) &&
@@ -212,7 +214,14 @@ export namespace MutationUtil {
             receiver = Type.isMap(type) ? receiver.get(prop)
                 : Type.isSet(type) ? getSetEntryAtIndex(receiver, +prop)
                     : receiver[prop]
-            const newType = (Type.isObject(type) ? type.props[prop] : type.type)
+
+            let newType = (Type.isObject(type) ? type.props[prop] : type.type)
+
+            if (Type.isNullable(newType)) {
+                if (receiver == null) throw new Error(`Mutation target is null "${prop}" at .${mutation.path.slice(0, i).join(".")}`)
+                newType = newType.base
+            }
+
             if (!newType || (
                 !Type.isObject(newType) &&
                 !Type.isArray(newType) &&
