@@ -21,14 +21,11 @@ export interface StructSyncContract<T extends { new(...args: any): any }, A exte
     defineController(): StructSyncContract.StructControllerClass<T, A, E>
 }
 
-const SERVER = Symbol("server")
 
 function makeFullID(id: string | null | undefined, name: string) {
     if (id) return `${name}::${id}`
     else return name
 }
-
-const SERVICE = Symbol("service")
 
 export class ControllerActionNotFoundError extends Error {
     public _isClientError = true
@@ -41,6 +38,8 @@ export class ControllerActionNotFoundError extends Error {
 export namespace StructSyncContract {
     export const ACTION_IMPLS = Symbol("actionImpls")
     export const INSTANCE_DECORATOR = Symbol("instanceDecorator")
+    export const SERVER = Symbol("server")
+    export const SERVICE = Symbol("service")
 
     export function define<
         T extends { new(...args: any): any, baseType: Type<any> },
@@ -244,7 +243,8 @@ export type StructProxy<
     {
         onMutate: EventEmitter<StructSyncMessages.AnyMutateMessage>
         emitEvent(event: string, payload: any): void
-        synchronize(): Promise<void>
+        synchronize(): Promise<void>,
+        [StructSyncContract.SERVICE]: StructSyncClient
     }
 
 export type StructController<
@@ -257,5 +257,6 @@ export type StructController<
         impl(impl: ActionType.FunctionsImpl<A>): StructController<T, A>["impl"]
         runAction<K extends keyof A>(name: K, argument: Parameters<ActionType.Functions<A>[K]>[0], meta: StructSyncMessages.MetaHandle): ReturnType<ActionType.Functions<A>[K]>
         mutate<T>(this: T, thunk: (v: T) => void): Promise<void>
-        register<T>(this: T, server?: StructSyncServer): T
+        register<T>(this: T, server?: StructSyncServer): T,
+        [StructSyncContract.SERVER]: StructSyncServer | null
     } & IEventListener
