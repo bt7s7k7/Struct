@@ -3,6 +3,8 @@ import { DIContext } from "../dependencyInjection/DIContext"
 import { DISPOSE } from "../eventLib/Disposable"
 import { EventEmitter } from "../eventLib/EventEmitter"
 import { EventListener } from "../eventLib/EventListener"
+import { WeakRef } from "../eventLib/SharedRef"
+import { Struct } from "../struct/Struct"
 import { StructController } from "./StructSyncContract"
 import { StructSyncMessages } from "./StructSyncMessages"
 import { StructSyncServer } from "./StructSyncServer"
@@ -10,6 +12,8 @@ import { StructSyncServer } from "./StructSyncServer"
 export class StructSyncSession extends EventListener {
     public readonly server = DIContext.current.inject(StructSyncServer)
     public readonly onError = new EventEmitter<Error>()
+
+    protected readonly defaultServices = new Map<string, WeakRef<StructController>>()
 
     public [DISPOSE]() {
         super[DISPOSE]()
@@ -23,6 +27,10 @@ export class StructSyncSession extends EventListener {
 
     public async emitEvent(event: StructSyncMessages.EventMessage) {
         await this.sendMessage(event)
+    }
+
+    public setDefaultService(controller: StructController, id = Struct.getBaseType(controller).name) {
+        this.defaultServices.set(id, controller.getWeakRef())
     }
 
     protected async sendMessage(message: StructSyncMessages.AnyProxyMessage) {
@@ -43,6 +51,19 @@ export class StructSyncSession extends EventListener {
                 })
             }
         }
+    }
+
+    protected findController(id: string) {
+        const ref = this.defaultServices.get(id)
+        if (ref) {
+            if (ref.alive) {
+                return ref.value
+            } else {
+                this.defaultServices.delete(id)
+            }
+        }
+
+        return this.server.find(id)
     }
 
     protected tracked: Record<string, StructController> = {}
@@ -71,11 +92,11 @@ export class StructSyncSession extends EventListener {
                     }
 
                     if (msg.type == "find") {
-                        const controller = this.server.find(msg.target)
+                        const controller = this.findController(msg.target)
                         if (msg.track) this.tracked[msg.target] = controller
                         return controller.serialize()
                     } else if (msg.type == "action") {
-                        return this.server.find(msg.target).runAction(msg.action, msg.argument, metaHandle)
+                        return this.findController(msg.target).runAction(msg.action, msg.argument, metaHandle)
                     } else if (msg.type == "meta") {
                         // Ignore
                     } else throw new Error(`Unknown msg type ${JSON.stringify((msg as any).type)}`)
