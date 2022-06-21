@@ -486,7 +486,7 @@ export namespace Type {
         })
     }
 
-    export function passthrough<T>(defaultValue: T) {
+    export function passthrough<T>(defaultValue: T, name = "passthrough") {
         return makeType<T>({
             default: () => defaultValue,
             deserialize(source: any) {
@@ -498,7 +498,7 @@ export namespace Type {
             getDefinition() {
                 return this.name
             },
-            name: "passthrough"
+            name
         })
     }
 
