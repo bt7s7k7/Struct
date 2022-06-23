@@ -169,7 +169,7 @@ export namespace Type {
     export const isSet = (type: Type<any>): type is SetType<any> => IS_SET in type
     export const isMap = (type: Type<any>): type is MapType<any> => IS_MAP in type
     export const isRecord = (type: Type<any>): type is RecordType<any> => IS_RECORD in type
-    export const isStringUnion = (type: Type<any>): type is StringUnionType<any> => IS_STRING_UNION in type
+    export const isEnum = (type: Type<any>): type is EnumType<any> => IS_STRING_UNION in type
     export const isObject = (type: Type<any>): type is ObjectType => IS_OBJECT in type
     export const isNullable = (type: Type<any>): type is NullableType<any> => IS_NULLABLE in type
 
@@ -193,9 +193,9 @@ export namespace Type {
         type: Type<T>
     }
 
-    export interface StringUnionType<T = string> extends Type<T> {
+    export interface EnumType<T = string> extends Type<T> {
         [IS_STRING_UNION]: true
-        entries: string[]
+        entries: (string | boolean | number)[]
     }
 
     export interface ObjectType<T extends Record<string, Type<any>> = Record<string, Type<any>>> extends Type<ResolveObjectType<T>> {
@@ -344,17 +344,17 @@ export namespace Type {
         type
     })
 
-    export const stringUnion = <T extends string[]>(...entries: T) => {
+    export const stringUnion = <T extends (string | boolean | number)[]>(...entries: T) => {
         const entriesLookup = new Set(entries)
 
-        return extendType<Type.StringUnionType<T[number]>, T[number]>({
+        return extendType<Type.EnumType<T[number]>, T[number]>({
             name: entries.join(" | "),
             getDefinition() { return this.name },
             default: () => entries[0],
             serialize: v => v,
             [IS_STRING_UNION]: true,
             deserialize(source) {
-                if (typeof source != "string" || !entriesLookup.has(source)) throw new SerializationError("Expected " + this.getDefinition(""))
+                if (!entriesLookup.has(source)) throw new SerializationError("Expected " + this.getDefinition(""))
 
                 return source
             },
@@ -561,6 +561,16 @@ export namespace Type {
         return type.deserialize(type.serialize(value))
     }
 }
+
+type _Enum = typeof Type.stringUnion
+declare module "./Type" {
+    export namespace Type {
+        const _enum: _Enum
+        export { _enum as enum }
+    }
+}
+
+Type.enum = Type.stringUnion
 
 const taggedUnionWrapper = Type.object({
     type: Type.string,
