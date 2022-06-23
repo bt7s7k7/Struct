@@ -1,4 +1,3 @@
-import { Struct } from "../struct/Struct"
 import { Type } from "../struct/Type"
 import { StructSyncMessages } from "./StructSyncMessages"
 
@@ -23,8 +22,10 @@ function findSetEntryIndex<T>(set: Set<T>, target: T) {
     return undefined
 }
 
+const DRY_MUTATION = {}
+
 export namespace MutationUtil {
-    export function runMutationThunk<T>(targetName: string, target: T, baseType: Type<any>, thunk: (proxy: T) => void) {
+    export function runMutationThunk<T>(targetName: string, target: T | null, baseType: Type<any>, thunk: (proxy: T) => void) {
         const mutations: StructSyncMessages.AnyMutateMessage[] = []
 
         const makeProxy = (object: any, _type: Type<any>, path: string[]): any => {
@@ -44,7 +45,7 @@ export namespace MutationUtil {
                 set(target, key, value, receiver) {
                     if (typeof key == "symbol") throw new Error("Cannon mutate a symbol indexed property")
 
-                    if (!Reflect.set(target, key, value, receiver)) return false
+                    if (target != DRY_MUTATION) if (!Reflect.set(target, key, value, receiver)) return false
 
                     const serializedValue = !Type.isObject(type) ? type.type.serialize(value) : type.props[key].serialize(value)
 
@@ -60,7 +61,7 @@ export namespace MutationUtil {
                 deleteProperty(target, key) {
                     if (typeof key == "symbol") throw new Error("Cannon mutate a symbol indexed property")
 
-                    if (!Reflect.deleteProperty(target, key)) return false
+                    if (target != DRY_MUTATION) if (!Reflect.deleteProperty(target, key)) return false
 
                     mutations.push({
                         type: "mut_delete",
@@ -86,7 +87,7 @@ export namespace MutationUtil {
                                     items: type.serialize(items)
                                 })
 
-                                target.splice(start, deleteCount, ...items)
+                                if (target != DRY_MUTATION) target.splice(start, deleteCount, ...items)
                             },
                             push(...items) {
                                 this.splice(this.length, 0, ...items)
@@ -108,10 +109,10 @@ export namespace MutationUtil {
                                     value: type.type.serialize(value)
                                 })
 
-                                target.set(key, value)
+                                if (target != DRY_MUTATION) target.set(key, value)
                             },
                             get(key) {
-                                const value = target.get(key)
+                                const value = target != DRY_MUTATION ? target.get(key) : DRY_MUTATION
                                 return makeProxy(value, type.type, [...path, key])
                             },
                             clear() {
@@ -124,7 +125,7 @@ export namespace MutationUtil {
                                     target: targetName
                                 })
 
-                                target.clear()
+                                if (target != DRY_MUTATION) target.clear()
                             },
                             delete(key) {
                                 if (!target.has(key)) return false
@@ -134,7 +135,7 @@ export namespace MutationUtil {
                                     target: targetName
                                 })
 
-                                target.delete(key)
+                                if (target != DRY_MUTATION) target.delete(key)
                                 return true
                             }
                         } as Partial<Map<string, any>>) as any)[key]
@@ -159,7 +160,7 @@ export namespace MutationUtil {
                                     target: targetName
                                 })
 
-                                target.add(value)
+                                if (target != DRY_MUTATION) target.add(value)
                             },
                             clear() {
                                 mutations.push({
@@ -171,7 +172,7 @@ export namespace MutationUtil {
                                     target: targetName
                                 })
 
-                                target.clear()
+                                if (target != DRY_MUTATION) target.clear()
                             },
                             delete(entry) {
                                 if (!target.has(entry)) return false
@@ -186,7 +187,7 @@ export namespace MutationUtil {
                                     items: []
                                 })
 
-                                target.delete(entry)
+                                if (target != DRY_MUTATION) target.delete(entry)
                                 return true
                             }
                         } as Partial<Set<any>>) as any)[key]
@@ -196,24 +197,25 @@ export namespace MutationUtil {
                         throw new Error(`Unsupported map operation ${JSON.stringify(key)}`)
                     }
 
-                    return makeProxy(Reflect.get(target, key, receiver), Type.isObject(type) ? type.props[key] : type.type, [...path, key])
+                    return makeProxy(target != DRY_MUTATION ? Reflect.get(target, key, receiver) : DRY_MUTATION, Type.isObject(type) ? type.props[key] : type.type, [...path, key])
                 }
             })
         }
 
-        thunk(makeProxy(target, baseType, []))
+        thunk(makeProxy(target ?? DRY_MUTATION, baseType, []))
 
         return mutations
     }
 
-    export function applyMutation(target: Struct.StructBase, mutation: StructSyncMessages.AnyMutateMessage) {
+    export function applyMutation(target: any, type: Type.ObjectType | Type.ArrayType | Type.RecordType | Type.MapType | Type.SetType | null, mutation: StructSyncMessages.AnyMutateMessage) {
         let receiver: any = target
-        let type = Struct.getBaseType(target) as Type.ObjectType | Type.ArrayType | Type.RecordType | Type.MapType | Type.SetType
 
         mutation.path.forEach((prop, i) => {
-            receiver = Type.isMap(type) ? receiver.get(prop)
+            receiver = type == null ? receiver[prop] : Type.isMap(type) ? receiver.get(prop)
                 : Type.isSet(type) ? getSetEntryAtIndex(receiver, +prop)
                     : receiver[prop]
+
+            if (type == null) return
 
             let newType = (Type.isObject(type) ? type.props[prop] : type.type)
 
@@ -233,14 +235,18 @@ export namespace MutationUtil {
         })
 
         if (mutation.type == "mut_assign") {
-            if (Type.isObject(type) || Type.isArray(type) || Type.isRecord(type)) {
+            if (type == null) {
+                receiver[mutation.key] = mutation.value
+            } else if (Type.isObject(type) || Type.isArray(type) || Type.isRecord(type)) {
                 const valueType = Type.isObject(type) ? type.props[mutation.key] : type.type
                 receiver[mutation.key] = valueType.deserialize(mutation.value)
             } else if (Type.isMap(type)) {
                 receiver.set(mutation.key, type.type.deserialize(mutation.value))
             } else throw new Error("Cannot use assign on type " + type.name)
         } else if (mutation.type == "mut_splice") {
-            if (Type.isArray(type)) {
+            if (type == null) {
+                receiver.splice(mutation.index, mutation.deleteCount, ...mutation.items)
+            } else if (Type.isArray(type)) {
                 receiver.splice(mutation.index, mutation.deleteCount, ...type.deserialize(mutation.items))
             } else if (Type.isSet(type)) {
                 if (mutation.deleteCount == -1) receiver.clear()
@@ -251,7 +257,9 @@ export namespace MutationUtil {
                 receiver.clear()
             } else throw new Error("Cannot use splice on type" + type.name)
         } else if (mutation.type == "mut_delete") {
-            if (Type.isObject(type) || Type.isRecord(type)) {
+            if (type == null) {
+                delete receiver[mutation.key]
+            } else if (Type.isObject(type) || Type.isRecord(type)) {
                 delete receiver[mutation.key]
             } else if (Type.isMap(type)) {
                 receiver.delete(mutation.key)
