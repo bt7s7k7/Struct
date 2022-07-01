@@ -132,6 +132,8 @@ export namespace StructSyncContract {
 
                     public getWeakRef = implementEventListener(this)
 
+                    public readonly onMutate = new EventEmitter<StructSyncMessages.AnyMutateMessage>()
+
                     public [DISPOSE]() {
                         this[SERVER]?.unregister(makeFullID((this as any).id, name))
                         disposeObject(this)
@@ -148,12 +150,21 @@ export namespace StructSyncContract {
                         return this.impl
                     }
 
-                    public async mutate(thunk: (proxy: any) => void) {
+                    public async mutate(thunk: ((proxy: any) => void) | StructSyncMessages.AnyMutateMessage) {
                         const fullName = makeFullID((this as any).id, name)
 
-                        const mutations = MutationUtil.runMutationThunk(fullName, this, base.baseType, thunk)
+                        if (typeof thunk != "function") {
+                            MutationUtil.applyMutation(this, base.baseType, thunk)
+                        }
+
+                        const mutations = typeof thunk == "function" ? (
+                            MutationUtil.runMutationThunk(fullName, this, base.baseType, thunk)
+                        ) : (
+                            [{ ...thunk, target: fullName }]
+                        )
 
                         if (this[SERVER]) for (const mutation of mutations) {
+                            this.onMutate.emit(mutation)
                             await this[SERVER]!.notifyMutation(mutation)
                         }
                     }
@@ -254,9 +265,10 @@ export type StructController<
     > = InstanceType<T> &
     EventType.Emitters<E> &
     {
+        onMutate: EventEmitter<StructSyncMessages.AnyMutateMessage>
         impl(impl: ActionType.FunctionsImpl<A>): StructController<T, A>["impl"]
         runAction<K extends keyof A>(name: K, argument: Parameters<ActionType.Functions<A>[K]>[0], meta: StructSyncMessages.MetaHandle): ReturnType<ActionType.Functions<A>[K]>
-        mutate<T>(this: T, thunk: (v: T) => void): Promise<void>
+        mutate<T>(this: T, thunk: ((v: T) => void) | StructSyncMessages.AnyMutateMessage): Promise<void>
         register<T>(this: T, server?: StructSyncServer): T,
         [StructSyncContract.SERVER]: StructSyncServer | null
     } & IEventListener
