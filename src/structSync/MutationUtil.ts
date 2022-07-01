@@ -207,7 +207,7 @@ export namespace MutationUtil {
         return mutations
     }
 
-    export function applyMutation(target: any, type: Type.ObjectType | Type.ArrayType | Type.RecordType | Type.MapType | Type.SetType | null, mutation: StructSyncMessages.AnyMutateMessage) {
+    export function applyMutation(target: any, type: Type<any> | null, mutation: StructSyncMessages.AnyMutateMessage) {
         let receiver: any = target
 
         mutation.path.forEach((prop, i) => {
@@ -217,7 +217,7 @@ export namespace MutationUtil {
 
             if (type == null) return
 
-            let newType = (Type.isObject(type) ? type.props[prop] : type.type)
+            let newType = (Type.isObject(type) ? type.props[prop] : (type as Type.ArrayType).type)
 
             if (Type.isNullable(newType)) {
                 if (receiver == null) throw new Error(`Mutation target is null "${prop}" at .${mutation.path.slice(0, i).join(".")}`)
