@@ -1,4 +1,4 @@
-function makeType<T>(values: Omit<Type<any>, "as" | "definition">): Type<T> {
+function makeType<T>(values: Omit<Type<any>, "as" | "definition" | "getDefinition"> & Partial<Pick<Type<any>, "getDefinition">>): Type<T> {
     return Object.assign({
         as(typeFactory) {
             return typeFactory(this as Type<any>)
@@ -9,8 +9,11 @@ function makeType<T>(values: Omit<Type<any>, "as" | "definition">): Type<T> {
             Object.defineProperty(this, "definition", { value: definition })
 
             return definition
+        },
+        getDefinition(indent) {
+            return indent + this.name
         }
-    } as Pick<Type<any>, "as" | "definition"> & ThisType<Type<any>>, values)
+    } as Pick<Type<any>, "as" | "definition" | "getDefinition"> & ThisType<Type<any>>, values) as Type<T>
 }
 
 function makePrimitive<T>(type: string, options: {
@@ -23,7 +26,7 @@ function makePrimitive<T>(type: string, options: {
         getDefinition: () => type,
         serialize: v => v,
         deserialize(source) {
-            if (options.check ? !options.check(source) : typeof source != type) throw new SerializationError("Expected " + this.getDefinition(""))
+            if (options.check ? !options.check(source) : typeof source != type) throw new SerializationError("Expected " + (this as Type<T>).getDefinition(""))
             return source
         }
     })
