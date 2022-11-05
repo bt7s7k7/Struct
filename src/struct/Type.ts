@@ -43,6 +43,8 @@ export interface Type<T> {
 }
 
 function makeObject<T extends Record<string, Type<any>>>(name: string, props: T) {
+    props = Object.assign(Object.create(null), props)
+
     const propList = Object.entries(props)
 
     const isAnon = name == "__anon"
@@ -107,6 +109,7 @@ const IS_RECORD = Symbol("isRecord")
 const IS_STRING_UNION = Symbol("isRecord")
 const IS_OBJECT = Symbol("isObject")
 const IS_NULLABLE = Symbol("isNullable")
+const IS_KEY_VALUE_PAIR = Symbol("isKeyValuePair")
 
 export interface TypeValuePair {
     type: Type<any>
@@ -159,7 +162,7 @@ type NullablePartial<
     T,
     NK extends keyof T = { [K in keyof T]: null extends T[K] ? K : never }[keyof T],
     NP = Partial<Pick<T, NK>> & Pick<T, Exclude<keyof T, NK>>
-    > = { [K in keyof NP]: NP[K] }
+> = { [K in keyof NP]: NP[K] }
 
 type GetTaggedUnionTypes<T extends Record<string, Type<any>>> = {
     [P in keyof T]: Type.GetTypeFromTypeWrapper<T[P]> extends void ? { type: P, value?: null } : { type: P, value: Type.GetTypeFromTypeWrapper<T[P]> }
@@ -175,6 +178,7 @@ export namespace Type {
     export const isEnum = (type: Type<any>): type is EnumType<any> => IS_STRING_UNION in type
     export const isObject = (type: Type<any>): type is ObjectType => IS_OBJECT in type
     export const isNullable = (type: Type<any>): type is NullableType<any> => IS_NULLABLE in type
+    export const isKeyValuePair = (type: Type<any>): type is KeyValuePair<any> => IS_KEY_VALUE_PAIR in type
 
     export interface ArrayType<T = any> extends Type<T[]> {
         [IS_ARRAY]: true
@@ -210,6 +214,15 @@ export namespace Type {
     export interface NullableType<T = any> extends Type<T | null> {
         [IS_NULLABLE]: true
         base: Type<T>
+    }
+
+    type MakeKeyValueOptions<T extends Record<string, Type<any>>> = {
+        [P in keyof T]: { key: P, value: GetTypeFromTypeWrapper<T[P]> }
+    }[keyof T]
+    export interface KeyValuePair<T extends Record<string, Type<any>>> extends Type<MakeKeyValueOptions<T>> {
+        [IS_KEY_VALUE_PAIR]: true,
+        base: ObjectType<T>
+        make<F extends MakeKeyValueOptions<T>>(value: F): F
     }
 
     export type GetTypeFromTypeWrapper<T extends Type<any>> = T extends Type<infer U> ? U : never
@@ -387,6 +400,35 @@ export namespace Type {
         },
         [IS_NULLABLE]: true,
         base: type
+    })
+
+    export const keyValuePair = <T extends Record<string, Type<any>>>(type: ObjectType<T>) => extendType<Type.KeyValuePair<T>, MakeKeyValueOptions<T>>({
+        name: `KeyValuePair<${type.name}>`,
+        default: () => { throw new Error("Cannot create default key value pair") },
+        getDefinition(indent) {
+            return indent + "KeyValuePair<" + type.getDefinition("") + ">"
+        },
+        serialize(source) {
+            const key = source.key
+            const prop = type.props[key]
+            return { key, value: prop.serialize(source.value) }
+        },
+        deserialize(source) {
+            if (!source || typeof source != "object" || source instanceof Array) throw new SerializationError("Expected " + this.getDefinition(""))
+
+            const key = string.deserialize(source.key)
+            if (!(key in type.props)) throw new SerializationError(`"${key}" is not a valid key of ${type.name}`)
+
+            const prop = type.props[key]
+            const value = SerializationError.catch("value", () => prop.deserialize(source.value))
+
+            return { key, value }
+        },
+        [IS_KEY_VALUE_PAIR]: true,
+        base: type,
+        make(value) {
+            return value
+        },
     })
 
     export const partial = <T>(type: Type<T>) => {
