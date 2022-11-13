@@ -12,12 +12,14 @@ import { StructSyncServer } from "./StructSyncServer"
 export class StructSyncSession extends EventListener {
     public readonly server = DIContext.current.inject(StructSyncServer)
     public readonly onError = new EventEmitter<Error>()
+    public readonly onBeforeDispose = new EventEmitter()
 
     protected readonly defaultServices = new Map<string, WeakRef<StructController>>()
 
     public [DISPOSE]() {
-        super[DISPOSE]()
+        this.onBeforeDispose.emit()
 
+        super[DISPOSE]()
         this.server.attachSession(this, "remove")
     }
 
