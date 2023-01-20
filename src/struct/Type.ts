@@ -478,7 +478,7 @@ export namespace Type {
             deserialize(source) {
                 const target = new ctor()
 
-                for (const [key, value] of Object.entries(target)) {
+                for (const [key, value] of Object.entries(target as any)) {
                     const targetType = typeof value
                     let sourceValue = source[key]
                     const sourceType = typeof sourceValue
