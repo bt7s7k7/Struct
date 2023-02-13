@@ -590,6 +590,21 @@ export namespace Type {
         })
     }
 
+    export const byKeyProperty = <T>(name: string, key: keyof T, lookup: ReadonlyMap<string, T> | ((key: string) => T | null | undefined), defaultFactory: () => null) => {
+        return Type.createType<T>({
+            name, default: defaultFactory,
+            serialize(source: T) {
+                return source[key]
+            },
+            deserialize(source) {
+                const id = Type.string.deserialize(source)
+                const type = typeof lookup == "function" ? lookup(id) : lookup.get(id)
+                if (type == null) throw new SerializationError(`Invalid ${name} ${key.toString()} "${id}"`)
+                return type
+            }
+        })
+    }
+
     export function defineMigrations<T extends Type<any>>(type: T, migration: { version: number, desc: string, migrate: (v: any) => any }[]) {
         const currVersion = migration.reduce((p, v) => Math.max(p, v.version), 0)
         const oldSerialize = type.serialize
