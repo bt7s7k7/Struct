@@ -384,6 +384,17 @@ export namespace Type {
         return makeObject("__anon", props)
     }
 
+    export const objectWithClass = <T extends object>(ctor: new (...args: any[]) => T, name: string, props: Record<string, Type<any>>, options: { default?: () => T } = {}) => {
+        const type = makeObject(name, props) as unknown as Type<T>
+        if (options.default) type.default = options.default
+        const oldDeserialize = type.deserialize
+        type.deserialize = (source) => {
+            return Object.assign(new ctor(), oldDeserialize(source))
+        }
+
+        return type
+    }
+
     export const nullable = <T>(type: Type<T>) => extendType<Type.NullableType<T>, T | null>({
         name: type.name + "?",
         default: () => null,
