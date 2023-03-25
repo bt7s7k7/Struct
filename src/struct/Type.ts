@@ -590,7 +590,7 @@ export namespace Type {
         })
     }
 
-    export const byKeyProperty = <T>(name: string, key: keyof T, lookup: ReadonlyMap<string, T> | ((key: string) => T | null | undefined), defaultFactory: () => null) => {
+    export const byKeyProperty = <T>(name: string, key: keyof T, lookup: ReadonlyMap<string, T> | ((key: string) => T | null | undefined), defaultFactory: () => T | null | undefined) => {
         return Type.createType<T>({
             name, default: defaultFactory,
             serialize(source: T) {
