@@ -1,4 +1,5 @@
-import { Type } from "./Type"
+import { Constructor } from "../comTypes/types"
+import { SerializationError, Type } from "./Type"
 
 type NullableKeys<T> = { [K in keyof T]: null extends T[K] ? K : never }[keyof T]
 type AllowVoidIfAllNullable<T> = Exclude<keyof T, NullableKeys<T>> extends never ? T | void : T
@@ -84,4 +85,66 @@ export namespace Struct {
     }
 
     export type BaseType<T extends Omit<StructStatics<any>, "">> = T extends { baseType: infer U } ? U : never
+
+    const _PolymorphicBase_t = Type.object({ __type: Type.string, id: Type.string })
+    export class PolymorphicGraphSerializer<T extends StructBase & { id: string }> {
+        protected _types = new Map<string, Constructor<T> & StructStatics>()
+        protected _cache: Map<string, { instance: T, type: Constructor<T> & StructStatics, data: any }> | null = null
+        protected _ref = Type.createType({
+            name: this.name,
+            default: () => null,
+            serialize: v => v.id,
+            deserialize: (id) => {
+                if (this._cache == null) throw new SerializationError("Cannot deserialize polymorphic graph reference outside of context")
+                const target = this._cache.get(id)
+                if (target == null) throw new SerializationError(`Cannot resolve reference to "${id}"`)
+                return target
+            }
+        })
+
+        public register(type: Constructor<T> & Pick<StructStatics, keyof StructStatics>) {
+            this._types.set(type.baseType.name, type)
+        }
+
+        public deserialize(objectsData: Iterable<any>) {
+            if (this._cache != null) throw new Error("Cannot create context, context already exists")
+            try {
+                this._cache = new Map()
+                for (let data of objectsData) {
+                    const { __type: typeID, id } = _PolymorphicBase_t.deserialize(data)
+                    const type = this._types.get(typeID)
+                    const error = new SerializationError(`Cannot find type "${typeID}"`)
+                    error.appendPath(id)
+                    if (type == null) throw error
+                    const instance = type.default()
+                    this._cache.set(id, { instance, data, type })
+                }
+
+                for (const { instance, data, type } of this._cache.values()) {
+                    Object.assign(instance, type.deserialize(data))
+                }
+
+                return [...this._cache.values()].map(v => v.instance)
+            } finally {
+                this._cache = null
+            }
+        }
+
+        public serialize(objects: Iterable<T>) {
+            if (this._cache != null) throw new Error("Cannot create context, context already exists")
+            const result: any[] = []
+            for (const object of objects) {
+                result.push(object.serialize())
+            }
+            return result
+        }
+
+        public ref<U extends T>() {
+            return this._ref as Type<U>
+        }
+
+        constructor(
+            public readonly name: string
+        ) { }
+    }
 }
