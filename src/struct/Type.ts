@@ -202,7 +202,7 @@ export namespace Type {
 
     export interface EnumType<T = string> extends Type<T> {
         [IS_STRING_UNION]: true
-        entries: (string | boolean | number)[]
+        entries: T[]
     }
 
     export interface ObjectType<T extends Record<string, Type<any>> = Record<string, Type<any>>> extends Type<ResolveObjectType<T>> {
