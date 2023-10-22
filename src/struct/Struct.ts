@@ -1,16 +1,104 @@
-import { Constructor } from "../comTypes/types"
 import { SerializationError, Type } from "./Type"
 
 type NullableKeys<T> = { [K in keyof T]: null extends T[K] ? K : never }[keyof T]
 type AllowVoidIfAllNullable<T> = Exclude<keyof T, NullableKeys<T>> extends never ? T | void : T
 
-export namespace Struct {
-    export function getBaseType(struct: StructBase): Type.ObjectType {
-        return (struct.constructor as StructStatics).baseType
+type ClassCtor = abstract new () => any
+type DecoratorType = Type<any> | ClassCtor
+
+const TYPE_HANDLE = Symbol.for("struct.typeHandle")
+class TypeHandle {
+    protected readonly _props: Record<string, DecoratorType> = {}
+    protected _name: string | null = null
+    protected _type: Type<any> | null = null
+    protected _ctor: ClassCtor | null = null
+
+    public addProperty(key: string, type: DecoratorType) {
+        this._props[key] = type
     }
 
-    export function getType(struct: StructBase) {
-        return struct.constructor as StructStatics
+    public setClass(name: string, ctor: ClassCtor) {
+        if (this._name != null) throw new Error("Duplicate setting of class for TypeHandle")
+        this._name = name
+        this._ctor = ctor
+    }
+
+    public getType() {
+        if (this._type == null) {
+            if (this._name == null) throw new Error("Cannot create a type for a decorated class, missing type decorator")
+            const ctor = this._ctor as new () => any
+
+            const props: Record<string, Type<any>> = {}
+            for (const [key, value] of Object.entries(this._props)) {
+                if (typeof value == "function") {
+                    const handle = getClassTypeHandle(value)
+                    if (handle == null) throw new Error(`Cannot get type from class for property "${key}" in class "${this._name}"`)
+                    props[key] = handle.value.getType()
+                } else {
+                    props[key] = value
+                }
+            }
+
+            this._type = Type.objectWithClass(ctor, this._name, props, {
+                default: () => new ctor()
+            })
+        }
+
+        return this._type
+    }
+
+    constructor(
+    ) { }
+
+}
+
+function getClassTypeHandle(ctor: ClassCtor) {
+    const original = ctor
+
+    while (ctor != null) {
+        if (TYPE_HANDLE in ctor) {
+            return {
+                class: ctor as ClassCtor,
+                value: ctor[TYPE_HANDLE] as TypeHandle,
+                inherited: ctor != original
+            }
+        }
+
+        ctor = Object.getPrototypeOf(ctor.prototype)?.constructor
+    }
+
+    return null
+}
+
+function ensureClassTypeHandle(ctor: ClassCtor) {
+    let handle
+
+    const existing = getClassTypeHandle(ctor)
+    if (existing == null || existing.inherited) {
+        handle = (ctor as typeof ctor & { [TYPE_HANDLE]: TypeHandle })[TYPE_HANDLE] = new TypeHandle()
+    } else {
+        handle = existing.value
+    }
+
+    return handle
+}
+
+export namespace Struct {
+    export function getBaseType(struct: any): Type<any> {
+        const type = getType(struct)
+        if (type == null) throw new Error("Cannot get base type, because the value is not a struct instance")
+        return "baseType" in type ? type.baseType as never : type
+    }
+
+    export function getType<T extends ClassCtor>(value: T): Type<InstanceType<T>>
+    export function getType<T extends { constructor: any }>(value: T): Type<T>
+    export function getType(value: ClassCtor | { constructor: any }) {
+        if (typeof value == "function") {
+            if ("baseType" in value) return value
+            return getClassTypeHandle(value as ClassCtor)?.value.getType() ?? null
+        } else {
+            return getType(value.constructor)
+        }
     }
 
     export class StructBase {
@@ -87,9 +175,9 @@ export namespace Struct {
     export type BaseType<T extends Omit<StructStatics<any>, "">> = T extends { baseType: infer U } ? U : never
 
     const _PolymorphicBase_t = Type.object({ __type: Type.string, id: Type.string })
-    export class PolymorphicGraphSerializer<T extends StructBase & { id: string }> {
-        protected _types = new Map<string, Constructor<T> & StructStatics>()
-        protected _cache: Map<string, { instance: T, type: Constructor<T> & StructStatics, data: any }> | null = null
+    export class PolymorphicGraphSerializer<T extends { id: string }> {
+        protected _types = new Map<string, Type<any>>()
+        protected _cache: Map<string, { instance: T, type: Type<any>, data: any }> | null = null
         protected _ref = Type.createType({
             name: this.name,
             default: () => null,
@@ -102,8 +190,9 @@ export namespace Struct {
             }
         })
 
-        public register(type: Constructor<T> & Pick<StructStatics, keyof StructStatics>) {
-            this._types.set(type.baseType.name, type)
+        public register(ctor: new (...args: any[]) => T) {
+            const type = getBaseType(ctor)
+            this._types.set(type.name, type)
         }
 
         public deserialize(objectsData: Iterable<any>) {
@@ -134,7 +223,8 @@ export namespace Struct {
             if (this._cache != null) throw new Error("Cannot create context, context already exists")
             const result: any[] = []
             for (const object of objects) {
-                result.push(object.serialize())
+                const type = getBaseType(object)
+                result.push(type.serialize(object))
             }
             return result
         }
@@ -146,5 +236,18 @@ export namespace Struct {
         constructor(
             public readonly name: string
         ) { }
+    }
+
+    export function type(name: string) {
+        return function (ctor: ClassCtor, _: unknown) {
+            ensureClassTypeHandle(ctor).setClass(name, ctor)
+        }
+    }
+
+    export function prop(type: DecoratorType) {
+        return function (prototype: any, ctx: string | { name: string }) {
+            const name = typeof ctx == "string" ? ctx : ctx.name
+            ensureClassTypeHandle(prototype.constructor).addProperty(name, type)
+        }
     }
 }
