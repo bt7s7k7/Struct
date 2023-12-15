@@ -666,6 +666,20 @@ export namespace Type {
     export function clone<T>(type: Type<T>, value: T) {
         return type.deserialize(type.serialize(value))
     }
+
+    export interface Action<T extends Type<any>, R extends Type<any>> {
+        argument: T
+        result: R
+    }
+
+    export type ActionArgument<T extends Action<Type<any>, Type<any>>> = T extends Action<infer U, any> ? Type.Extract<U> : never
+    export type ActionResult<T extends Action<Type<any>, Type<any>>> = T extends Action<any, infer U> ? Type.Extract<U> : never
+
+    export function action<T extends Type<any>, R extends Type<any>>(argument: T, result: R): Action<T, R> {
+        return { argument, result }
+    }
+
+    export const EMPTY_ACTION = action(empty, empty)
 }
 
 type _Enum = typeof Type.stringUnion
