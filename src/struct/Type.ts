@@ -102,14 +102,15 @@ function extendType<I extends Type<T>, T>(values: Omit<I, "as" | "definition">):
     return makeType<T>(values) as I
 }
 
-const IS_ARRAY = Symbol("isArray")
-const IS_SET = Symbol("isArray")
-const IS_MAP = Symbol("isArray")
-const IS_RECORD = Symbol("isRecord")
-const IS_STRING_UNION = Symbol("isRecord")
-const IS_OBJECT = Symbol("isObject")
-const IS_NULLABLE = Symbol("isNullable")
-const IS_KEY_VALUE_PAIR = Symbol("isKeyValuePair")
+const IS_ARRAY = Symbol.for("struct.isArray")
+const IS_SET = Symbol.for("struct.isSet")
+const IS_MAP = Symbol.for("struct.isMap")
+const IS_RECORD = Symbol.for("struct.isRecord")
+const IS_STRING_UNION = Symbol.for("struct.isStringUnion")
+const IS_OBJECT = Symbol.for("struct.isObject")
+const IS_NULLABLE = Symbol.for("struct.isNullable")
+const IS_OPTIONAL = Symbol.for("struct.isOptional")
+const IS_KEY_VALUE_PAIR = Symbol.for("struct.isKeyValuePair")
 
 export interface TypeValuePair {
     type: Type<any>
@@ -165,7 +166,7 @@ type NullablePartial<
 > = { [K in keyof NP]: NP[K] }
 
 type GetTaggedUnionTypes<T extends Record<string, Type<any>>> = {
-    [P in keyof T]: Type.GetTypeFromTypeWrapper<T[P]> extends void ? { type: P, value?: null } : { type: P, value: Type.GetTypeFromTypeWrapper<T[P]> }
+    [P in keyof T]: Type.Extract<T[P]> extends void ? { type: P, value?: null } : { type: P, value: Type.Extract<T[P]> }
 }[keyof T]
 
 export namespace Type {
@@ -228,7 +229,7 @@ export namespace Type {
     }
 
     type MakeKeyValueOptions<T extends Record<string, Type<any>>> = {
-        [P in keyof T]: { key: P, value: GetTypeFromTypeWrapper<T[P]> }
+        [P in keyof T]: { key: P, value: Extract<T[P]> }
     }[keyof T]
     export interface KeyValuePair<T extends Record<string, Type<any>>> extends Type<MakeKeyValueOptions<T>> {
         [IS_KEY_VALUE_PAIR]: true,
@@ -236,9 +237,11 @@ export namespace Type {
         make<F extends MakeKeyValueOptions<T>>(value: F): F
     }
 
-    export type GetTypeFromTypeWrapper<T extends Type<any>> = T extends Type<infer U> ? U : never
+    export type Extract<T extends Type<any>> = T extends Type<infer U> ? U : never
+    /** @deprecated Use `Type.Extract` */
+    export type GetTypeFromTypeWrapper<T extends Type<any>> = Type.Extract<T>
     export type ResolveObjectType<T extends Record<string, Type<any>>> = NullablePartial<{
-        [P in keyof T]: GetTypeFromTypeWrapper<T[P]>
+        [P in keyof T]: Extract<T[P]>
     }>
 
     export const number = makePrimitive<number>("number", { default: 0 })
@@ -590,13 +593,14 @@ export namespace Type {
     }
 
     export function taggedUnion<T extends Record<string, Type<any>>>(types: T) {
-        const typeList = Object.entries(types)
+        const typeList = Object.entries(types) as unknown as TaggedUnionType<T>["typeList"]
 
         const getDefinition = (indent: string) => {
             return typeList.map(v => `${JSON.stringify(v[0])} => ${v[1].getDefinition(indent)}`).join(",\n")
         }
 
-        return makeType<GetTaggedUnionTypes<T>>({
+        return extendType<TaggedUnionType<T>, GetTaggedUnionTypes<T>>({
+            types, typeList,
             default() {
                 return { type: typeList[0][0], value: typeList[0][1].default() }
             },
