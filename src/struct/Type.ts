@@ -1,7 +1,7 @@
 function makeType<T>(values: Omit<Type<any>, "as" | "definition" | "getDefinition"> & Partial<Pick<Type<any>, "getDefinition">>): Type<T> {
     return Object.assign({
-        as(typeFactory) {
-            return typeFactory(this as Type<any>)
+        as(typeFactory, ...args) {
+            return typeFactory(this as Type<any>, ...args)
         },
         get definition() {
             const definition = this.getDefinition("")
@@ -37,7 +37,7 @@ export interface Type<T> {
     definition: string
     getDefinition(indent: string): string
     default(): T
-    as<R>(typeFactory: (type: Type<T>) => R): R
+    as<R, A extends any[]>(typeFactory: (type: Type<T>, ...args: A) => R, ...args: A): R
     serialize(source: T): any
     deserialize(source: any): T
 }
@@ -178,6 +178,7 @@ export namespace Type {
     export const isEnum = (type: Type<any>): type is EnumType<any> => IS_STRING_UNION in type
     export const isObject = (type: Type<any>): type is ObjectType => IS_OBJECT in type
     export const isNullable = (type: Type<any>): type is NullableType<any> => IS_NULLABLE in type
+    export const isOptional = (type: Type<any>): type is OptionalType<any> => IS_OPTIONAL in type
     export const isKeyValuePair = (type: Type<any>): type is KeyValuePair<any> => IS_KEY_VALUE_PAIR in type
 
     export interface ArrayType<T = any> extends Type<T[]> {
@@ -214,6 +215,16 @@ export namespace Type {
     export interface NullableType<T = any> extends Type<T | null> {
         [IS_NULLABLE]: true
         base: Type<T>
+    }
+
+    export interface OptionalType<T = any> extends Type<T> {
+        [IS_OPTIONAL]: true
+        base: Type<T>
+    }
+
+    export interface TaggedUnionType<T extends Record<string, Type<any>>> extends Type<GetTaggedUnionTypes<T>> {
+        types: T,
+        typeList: { [P in keyof T]: [P, T[P]] }[keyof T][]
     }
 
     type MakeKeyValueOptions<T extends Record<string, Type<any>>> = {
@@ -413,6 +424,26 @@ export namespace Type {
         base: type
     })
 
+    export const optional = <T>(type: Type<T>, defaultValue: (() => T) | null = null) => extendType<Type.OptionalType<T>, T>({
+        name: type.name,
+        default: type.default,
+        serialize: type.serialize,
+        getDefinition: type.getDefinition,
+        deserialize(source) {
+            if (source == null) {
+                if (defaultValue) {
+                    return defaultValue()
+                } else {
+                    return type.default()
+                }
+            }
+
+            return type.deserialize(source)
+        },
+        [IS_OPTIONAL]: true,
+        base: type
+    })
+
     export const keyValuePair = <T extends Record<string, Type<any>>>(type: ObjectType<T>) => extendType<Type.KeyValuePair<T>, MakeKeyValueOptions<T>>({
         name: `KeyValuePair<${type.name}>`,
         default: () => { throw new Error("Cannot create default key value pair") },
@@ -452,9 +483,9 @@ export namespace Type {
         let instance: Type<T> | null = null
 
         return {
-            as(f) {
+            as(f, ...args) {
                 if (!instance) instance = thunk()
-                return instance.as(f)
+                return instance.as(f, ...args)
             },
             default() {
                 if (!instance) instance = thunk()
