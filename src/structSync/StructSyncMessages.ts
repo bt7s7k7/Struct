@@ -1,3 +1,4 @@
+import { Mutation } from "../struct/Mutation"
 import { StructSyncClient } from "./StructSyncClient"
 import { StructSyncSession } from "./StructSyncSession"
 
@@ -10,7 +11,6 @@ export namespace StructSyncMessages {
     }
 
     interface MessageBase {
-        type: string
         [index: `_${string}`]: any
     }
 
@@ -39,23 +39,11 @@ export namespace StructSyncMessages {
         track: boolean
     }
 
-    export interface AssignMutateMessage extends MutateMessageBase {
-        type: "mut_assign"
-        value: any
-        key: string
-    }
+    export interface AssignMutateMessage extends MutateMessageBase, Omit<Mutation.AssignMutation, "serialize"> { }
 
-    export interface SpliceMutateMessage extends MutateMessageBase {
-        type: "mut_splice"
-        index: number
-        deleteCount: number
-        items: any[]
-    }
+    export interface SpliceMutateMessage extends MutateMessageBase, Omit<Mutation.SpliceMutation, "serialize"> { }
 
-    export interface DeleteMutateMessage extends MutateMessageBase {
-        type: "mut_delete"
-        key: string
-    }
+    export interface DeleteMutateMessage extends MutateMessageBase, Omit<Mutation.DeleteMutation, "serialize"> { }
 
     export interface EventMessage extends ControllerMessageBase {
         type: "event"

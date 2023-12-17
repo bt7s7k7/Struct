@@ -1,5 +1,6 @@
 import { Type } from "../struct/Type"
-import { StructSyncMessages } from "./StructSyncMessages"
+import { StructSyncMessages } from "../structSync/StructSyncMessages"
+import { Struct } from "./Struct"
 
 function getSetEntryAtIndex<T>(set: Set<T>, index: number) {
     let i = 0
@@ -24,9 +25,32 @@ function findSetEntryIndex<T>(set: Set<T>, target: T) {
 
 const DRY_MUTATION = {}
 
-export namespace MutationUtil {
-    export function runMutationThunk<T>(targetName: string, target: T | null, baseType: Type<any>, thunk: (proxy: T) => void) {
-        const mutations: StructSyncMessages.AnyMutateMessage[] = []
+export namespace Mutation {
+    export class AssignMutation extends Struct.define("AssignMutation", {
+        type: Type.enum("mut_assign"),
+        value: Type.passthrough<any>(null),
+        key: Type.string,
+        path: Type.string.as(Type.array)
+    }) { }
+
+    export class SpliceMutation extends Struct.define("SpliceMutation", {
+        type: Type.enum("mut_splice"),
+        index: Type.number,
+        deleteCount: Type.number,
+        items: Type.passthrough<any>(null).as(Type.array),
+        path: Type.string.as(Type.array)
+    }) { }
+
+    export class DeleteMutation extends Struct.define("DeleteMutation", {
+        type: Type.enum("mut_delete"),
+        key: Type.string,
+        path: Type.string.as(Type.array)
+    }) { }
+
+    export type AnyMutation = AssignMutation | SpliceMutation | DeleteMutation
+
+    export function create<T>(target: T | null, baseType: Type<any>, thunk: (proxy: T) => void) {
+        const mutations: AnyMutation[] = []
 
         const makeProxy = (object: any, _type: Type<any>, path: string[]): any => {
             const type = Type.isNullable(_type) ? _type.base : _type
@@ -49,12 +73,11 @@ export namespace MutationUtil {
 
                     const serializedValue = !Type.isObject(type) ? type.type.serialize(value) : type.props[key].serialize(value)
 
-                    mutations.push({
+                    mutations.push(new AssignMutation({
                         type: "mut_assign",
-                        target: targetName,
                         value: serializedValue,
                         path, key
-                    })
+                    }))
 
                     return true
                 },
@@ -63,11 +86,10 @@ export namespace MutationUtil {
 
                     if (target != DRY_MUTATION) if (!Reflect.deleteProperty(target, key)) return false
 
-                    mutations.push({
+                    mutations.push(new DeleteMutation({
                         type: "mut_delete",
-                        target: targetName,
                         path, key
-                    })
+                    }))
 
                     return true
                 },
@@ -79,13 +101,12 @@ export namespace MutationUtil {
 
                         const func = ({
                             splice(start: number, deleteCount: number, ...items: any[]) {
-                                mutations.push({
+                                mutations.push(new SpliceMutation({
                                     type: "mut_splice",
                                     deleteCount, path,
-                                    target: targetName,
                                     index: start,
                                     items: type.serialize(items)
-                                })
+                                }))
 
                                 if (target != DRY_MUTATION) target.splice(start, deleteCount, ...items)
                             },
@@ -102,12 +123,11 @@ export namespace MutationUtil {
 
                         const func = (({
                             set(key, value) {
-                                mutations.push({
+                                mutations.push(new AssignMutation({
                                     type: "mut_assign",
                                     path, key,
-                                    target: targetName,
                                     value: type.type.serialize(value)
-                                })
+                                }))
 
                                 if (target != DRY_MUTATION) target.set(key, value)
                             },
@@ -116,24 +136,22 @@ export namespace MutationUtil {
                                 return makeProxy(value, type.type, [...path, key])
                             },
                             clear() {
-                                mutations.push({
+                                mutations.push(new SpliceMutation({
                                     type: "mut_splice",
                                     deleteCount: -1,
                                     index: 0,
                                     items: [],
                                     path,
-                                    target: targetName
-                                })
+                                }))
 
                                 if (target != DRY_MUTATION) target.clear()
                             },
                             delete(key) {
                                 if (!target.has(key)) return false
-                                mutations.push({
+                                mutations.push(new DeleteMutation({
                                     type: "mut_delete",
                                     key, path,
-                                    target: targetName
-                                })
+                                }))
 
                                 if (target != DRY_MUTATION) target.delete(key)
                                 return true
@@ -149,7 +167,7 @@ export namespace MutationUtil {
                         const func = (({
                             add(value) {
                                 if (target.has(value)) return
-                                mutations.push({
+                                mutations.push(new SpliceMutation({
                                     type: "mut_splice",
                                     deleteCount: 0,
                                     index: 0,
@@ -157,20 +175,18 @@ export namespace MutationUtil {
                                         type.type.serialize(value)
                                     ],
                                     path,
-                                    target: targetName
-                                })
+                                }))
 
                                 if (target != DRY_MUTATION) target.add(value)
                             },
                             clear() {
-                                mutations.push({
+                                mutations.push(new SpliceMutation({
                                     type: "mut_splice",
                                     deleteCount: -1,
                                     index: 0,
                                     items: [],
                                     path,
-                                    target: targetName
-                                })
+                                }))
 
                                 if (target != DRY_MUTATION) target.clear()
                             },
@@ -179,13 +195,12 @@ export namespace MutationUtil {
                                 const index = findSetEntryIndex(target, entry)
                                 if (index == undefined) throw new Error("Didn't find entry index, even though the set has it")
 
-                                mutations.push({
+                                mutations.push(new SpliceMutation({
                                     type: "mut_splice",
                                     index, path,
                                     deleteCount: 1,
-                                    target: targetName,
                                     items: []
-                                })
+                                }))
 
                                 if (target != DRY_MUTATION) target.delete(entry)
                                 return true
@@ -207,7 +222,7 @@ export namespace MutationUtil {
         return mutations
     }
 
-    export function applyMutation(target: any, type: Type<any> | null, mutation: StructSyncMessages.AnyMutateMessage) {
+    export function apply(target: any, type: Type<any> | null, mutation: StructSyncMessages.AnyMutateMessage) {
         let receiver: any = target
 
         mutation.path.forEach((prop, i) => {

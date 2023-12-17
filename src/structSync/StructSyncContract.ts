@@ -2,11 +2,11 @@ import { DIContext } from "../dependencyInjection/DIContext"
 import { DISPOSE, disposeObject, IDisposable } from "../eventLib/Disposable"
 import { EventEmitter } from "../eventLib/EventEmitter"
 import { IEventListener, implementEventListener } from "../eventLib/EventListener"
+import { Mutation } from "../struct/Mutation"
 import { Struct } from "../struct/Struct"
 import { Type } from "../struct/Type"
 import { ActionType } from "./ActionType"
 import { EventType } from "./EventType"
-import { MutationUtil } from "./MutationUtil"
 import { StructSyncClient } from "./StructSyncClient"
 import { StructSyncMessages } from "./StructSyncMessages"
 import { StructSyncServer } from "./StructSyncServer"
@@ -44,7 +44,7 @@ export namespace StructSyncContract {
     export function define<
         T extends { new(...args: any): any, baseType: Type<any> },
         A extends Record<string, ActionType<any, any>>,
-        >(base: T, actions: A): StructSyncContract<T, A, {}>
+    >(base: T, actions: A): StructSyncContract<T, A, {}>
     export function define<
         T extends { new(...args: any): any, baseType: Type<any> },
         A extends Record<string, ActionType<any, any>>,
@@ -154,11 +154,11 @@ export namespace StructSyncContract {
                         const fullName = makeFullID((this as any).id, name)
 
                         if (typeof thunk != "function") {
-                            MutationUtil.applyMutation(this, base.baseType, thunk)
+                            Mutation.apply(this, base.baseType, thunk)
                         }
 
                         const mutations = typeof thunk == "function" ? (
-                            MutationUtil.runMutationThunk(fullName, this, base.baseType, thunk)
+                            Mutation.create(this, base.baseType, thunk).map(v => ({ ...v, target: fullName }))
                         ) : (
                             [{ ...thunk, target: fullName }]
                         )
@@ -219,7 +219,7 @@ export namespace StructSyncContract {
         T extends { new(...args: any): any },
         A extends Record<string, ActionType<any, any>>,
         E extends Record<string, EventType<any>>
-        > {
+    > {
         new(client: StructSyncClient, data: any): StructProxy<T, A, E>
         make<T extends new (...args: any[]) => any>(this: T, context: DIContext, options?: StructProxyFactoryOptions): Promise<InstanceType<T>>
         default<T extends new (...args: any[]) => any>(this: T): InstanceType<T>
@@ -229,9 +229,9 @@ export namespace StructSyncContract {
         T extends { new(...args: any): any },
         A extends Record<string, ActionType<any, any>>,
         E extends Record<string, EventType<any>>
-        > = Pick<T, keyof T> & {
-            new(...args: ConstructorParameters<T>): StructController<T, A, E>
-        }
+    > = Pick<T, keyof T> & {
+        new(...args: ConstructorParameters<T>): StructController<T, A, E>
+    }
 
     export function addDecorator<T>(ctor: { new(...args: any): T }, decorator: (instance: T) => any) {
         const target = ctor as unknown as { [INSTANCE_DECORATOR]: (<T>(instance: T) => T) | null }
@@ -246,7 +246,7 @@ export type StructProxy<
     T extends { new(...args: any): any } = { new(): Struct.StructBase } & Type<any>,
     A extends Record<string, ActionType<any, any>> = Record<string, ActionType<any, any>>,
     E extends Record<string, EventType<any>> = Record<string, EventType<any>>,
-    > =
+> =
     InstanceType<T> &
     EventType.Emitters<E> &
     ActionType.Functions<A> &
@@ -262,7 +262,7 @@ export type StructController<
     T extends { new(...args: any): any } = { new(): Struct.StructBase } & Type<any>,
     A extends Record<string, ActionType<any, any>> = Record<string, ActionType<any, any>>,
     E extends Record<string, EventType<any>> = Record<string, EventType<any>>
-    > = InstanceType<T> &
+> = InstanceType<T> &
     EventType.Emitters<E> &
     {
         onMutate: EventEmitter<StructSyncMessages.AnyMutateMessage>
