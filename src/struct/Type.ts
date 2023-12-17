@@ -16,6 +16,8 @@ function makeType<T>(values: Omit<Type<any>, "as" | "definition" | "getDefinitio
     } as Pick<Type<any>, "as" | "definition" | "getDefinition"> & ThisType<Type<any>>, values) as Type<T>
 }
 
+type _Extract<T, U> = Extract<T, U>
+
 function makePrimitive<T>(type: string, options: {
     default: T,
     check?: (v: any) => boolean
@@ -636,6 +638,26 @@ export namespace Type {
                 const type = typeof lookup == "function" ? lookup(id) : lookup.get(id)
                 if (type == null) throw new SerializationError(`Invalid ${name} ${key.toString()} "${id}"`)
                 return type
+            }
+        })
+    }
+
+    export const byKeyUnion = <T, K extends keyof T>(name: string, key: K, lookup: Record<_Extract<T[K], string>, T extends infer U ? Type<U> : never>, defaultFactory: () => T | null) => {
+        const _lookup = new Map(Object.entries(lookup)) as Map<string, Type<any>>
+        return Type.createType<T>({
+            name, default: defaultFactory,
+            serialize(source: T) {
+                const id = source[key] as any as string
+                const type = _lookup.get(id)
+                if (type == null) throw new SerializationError(`Invalid ${name} ${key.toString()} "${id}"`)
+                return type.serialize(source)
+            },
+            deserialize(source) {
+                if (typeof source != "object" || source == null) throw new SerializationError("Expected " + name)
+                const id = Type.string.deserialize(source[key]) as string
+                const type = _lookup.get(id)
+                if (type == null) throw new SerializationError(`Invalid ${name} ${key.toString()} "${id}"`)
+                return type.deserialize(source)
             }
         })
     }
