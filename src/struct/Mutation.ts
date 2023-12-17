@@ -1,5 +1,4 @@
 import { Type } from "../struct/Type"
-import { StructSyncMessages } from "../structSync/StructSyncMessages"
 import { Struct } from "./Struct"
 
 function getSetEntryAtIndex<T>(set: Set<T>, index: number) {
@@ -222,7 +221,7 @@ export namespace Mutation {
         return mutations
     }
 
-    export function apply(target: any, type: Type<any> | null, mutation: StructSyncMessages.AnyMutateMessage) {
+    export function apply(target: any, type: Type<any> | null, mutation: AnyMutation) {
         let receiver: any = target
 
         mutation.path.forEach((prop, i) => {
