@@ -59,7 +59,7 @@ function getClassTypeHandle(ctor: ClassCtor) {
         if (TYPE_HANDLE in ctor) {
             return {
                 class: ctor as ClassCtor,
-                value: ctor[TYPE_HANDLE] as TypeHandle,
+                value: (ctor as any)[TYPE_HANDLE] as TypeHandle,
                 inherited: ctor != original
             }
         }
@@ -87,7 +87,7 @@ export namespace Struct {
     export function getBaseType(struct: any): Type<any> {
         const type = getType(struct)
         if (type == null) throw new Error("Cannot get base type, because the value is not a struct instance")
-        return "baseType" in type ? type.baseType as never : type
+        return "baseType" in type ? (type as unknown as StructStatics).baseType as never : type
     }
 
     export function getType<T extends ClassCtor>(value: T): Type<InstanceType<T>>
