@@ -9,6 +9,11 @@ const structSync = project.prefix("src").res("structSync",
     github("bt7s7k7/DependencyInjection").res("dependencyInjection")
 )
 
+project.prefix("src").res("structRPC",
+    struct,
+    github("bt7s7k7/DependencyInjection").res("dependencyInjection")
+)
+
 const structSyncExpress = project.prefix("src").res("structSyncExpress", structSync)
 const structSyncAxios = project.prefix("src").res("structSyncAxios", structSync)
 
