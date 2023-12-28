@@ -1,19 +1,25 @@
-function makeType<T>(values: Omit<Type<any>, "as" | "definition" | "getDefinition"> & Partial<Pick<Type<any>, "getDefinition">>): Type<T> {
-    return Object.assign({
+function makeType<T>(options: Omit<Type<any>, "as" | "definition" | "getDefinition"> & Partial<Pick<Type<any>, "getDefinition">>): Type<T> {
+    const result = Object.assign({
         as(typeFactory, ...args) {
             return typeFactory(this as Type<any>, ...args)
         },
-        get definition() {
+        getDefinition(indent) {
+            return indent + this.name
+        }
+    } as Pick<Type<any>, "as" | "definition" | "getDefinition"> & ThisType<Type<any>>, options) as Type<T>
+
+    Object.defineProperty(result, "definition", {
+        get(this: typeof result) {
             const definition = this.getDefinition("")
 
             Object.defineProperty(this, "definition", { value: definition })
 
             return definition
         },
-        getDefinition(indent) {
-            return indent + this.name
-        }
-    } as Pick<Type<any>, "as" | "definition" | "getDefinition"> & ThisType<Type<any>>, values) as Type<T>
+        configurable: true
+    })
+
+    return result
 }
 
 type _Extract<T, U> = Extract<T, U>

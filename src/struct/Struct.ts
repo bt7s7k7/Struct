@@ -101,33 +101,38 @@ export namespace Struct {
         }
     }
 
-    export class StructBase {
-        serialize<T extends { constructor: any }>(this: T): any {
-            return this.constructor.serialize(this)
-        }
+    export interface StructBase {
+        serialize<T extends { constructor: any }>(this: T): any
     }
 
     type FilterProps<T> = Pick<T, keyof T>
-    export type StructConcept<T extends Record<string, Type<any>> = Record<string, Type<any>>> = FilterProps<Struct.TypedStruct<Type.ObjectType<T>>> & { new(source: any): Type.ResolveObjectType<T> & StructBase }
+    export type StructConcept<T extends Record<string, Type<any>> = Record<string, Type<any>>> = FilterProps<Struct.TypedStruct<Type.ObjectType<T>, typeof Object>> & { new(source: any): Type.ResolveObjectType<T> & StructBase }
 
-    export interface StructStatics<T extends Type.ObjectType = Type.ObjectType> {
-        new(source: AllowVoidIfAllNullable<Type.ResolveObjectType<T["props"]>>): StructBase & Type.ResolveObjectType<T["props"]>
+    export interface StructStatics<T extends Type.ObjectType = Type.ObjectType, B = {}> {
+        new(source: AllowVoidIfAllNullable<Type.ResolveObjectType<T["props"]>>): StructBase & Type.ResolveObjectType<T["props"]> & B
         default<T extends { new(...args: any): any }>(this: T): InstanceType<T>
         deserialize<T extends { new(...args: any): any }>(this: T, source: any): InstanceType<T>
         ref<T extends { new(...args: any): any }>(this: T): Type<InstanceType<T>>
         readonly baseType: T
     }
 
-    export type TypedStruct<T extends Type.ObjectType<any>> = Omit<T, "default" | "serialize" | "deserialize"> & StructStatics<T>
-    export type ExtendableTypedStruct<T extends Type.ObjectType<any>> = Omit<TypedStruct<T>, "ffff">
+    export type TypedStruct<T extends Type.ObjectType<any>, B extends abstract new () => any> = Omit<T, "default" | "serialize" | "deserialize"> & StructStatics<T, InstanceType<B>>
+    export type ExtendableTypedStruct<T extends Type.ObjectType<any>> = Omit<TypedStruct<T, typeof Object>, "ffff">
 
-    export function define<T extends Record<string, Type<any>>>(name: string, props: T): TypedStruct<Type.ObjectType<T>> {
+    export function define<T extends Record<string, Type<any>>, B extends abstract new () => any = typeof Object>(name: string, props: T, base?: B): TypedStruct<Type.ObjectType<T>, B> {
         const objectType = Type.namedType(name, props)
 
-        class StructInstance extends StructBase {
+        class StructInstance extends (base ?? Object) implements StructBase {
+            public serialize<T extends { constructor: any }>(this: T): any {
+                return this.constructor.serialize(this)
+            }
+
             constructor(source: Type.ResolveObjectType<T>) {
                 super()
                 Object.assign(this, source ?? {})
+                if ("_postDeserialize" in this) {
+                    (this as any)._postDeserialize()
+                }
             }
 
             public static readonly baseType = objectType
@@ -163,7 +168,7 @@ export namespace Struct {
             })
         }
 
-        const ret = StructInstance as TypedStruct<Type.ObjectType<T>>
+        const ret = StructInstance as TypedStruct<Type.ObjectType<T>, B>
 
         ret.ref = function () {
             return this as any
