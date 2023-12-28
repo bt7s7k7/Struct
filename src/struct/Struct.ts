@@ -174,11 +174,57 @@ export namespace Struct {
 
     export type BaseType<T extends Omit<StructStatics<any>, "">> = T extends { baseType: infer U } ? U : never
 
-    const _PolymorphicBase_t = Type.object({ __type: Type.string, id: Type.string })
-    export class PolymorphicGraphSerializer<T extends { id: string }> {
+    const _PolymorphicBase_t = Type.object({ __type: Type.string })
+    export class PolymorphicSerializer<T> {
         protected _types = new Map<string, Type<any>>()
-        protected _cache: Map<string, { instance: T, type: Type<any>, data: any }> | null = null
         protected _ref = Type.createType({
+            name: this.name,
+            default: () => null,
+            serialize: (source) => {
+                const type = Struct.getBaseType(source)
+                const data = type.serialize(source)
+                data.__type = type.name
+
+                return data
+            },
+            deserialize: (source) => {
+                const { __type: typeID } = _PolymorphicBase_t.deserialize(source)
+
+                const type = this._types.get(typeID)
+                if (type == null) throw new SerializationError(`Cannot find type "${typeID}"`)
+
+                return type.deserialize(source)
+            }
+        })
+
+        public get base() { return this._ref as Type<T> }
+
+        public getTypes() {
+            return this._types as ReadonlyMap<string, Type<any>>
+        }
+
+        public getTypeNames() {
+            return [...this._types.keys()]
+        }
+
+        public register(ctor: new (...args: any[]) => T) {
+            const type = getType(ctor)
+            this._types.set(getBaseType(type).name, type)
+        }
+
+        public ref<U extends T = T>() {
+            return this._ref as Type<U>
+        }
+
+        constructor(
+            public readonly name: string
+        ) { }
+    }
+
+    const _PolymorphicGraphBase_t = Type.object({ __type: Type.string, id: Type.string })
+    export class PolymorphicGraphSerializer<T extends { id: string }> extends PolymorphicSerializer<T> {
+        protected _cache: Map<string, { instance: T, type: Type<any>, data: any }> | null = null
+        protected _graphRef = Type.createType({
             name: this.name,
             default: () => null,
             serialize: v => v.id,
@@ -190,27 +236,43 @@ export namespace Struct {
             }
         })
 
-        public register(ctor: new (...args: any[]) => T) {
-            const type = getBaseType(ctor)
-            this._types.set(type.name, type)
-        }
+        public get base() { return this._graphRef as Type<T> }
 
         public deserialize(objectsData: Iterable<any>) {
             if (this._cache != null) throw new Error("Cannot create context, context already exists")
             try {
                 this._cache = new Map()
+                let index = -1
                 for (let data of objectsData) {
-                    const { __type: typeID, id } = _PolymorphicBase_t.deserialize(data)
-                    const type = this._types.get(typeID)
-                    const error = new SerializationError(`Cannot find type "${typeID}"`)
-                    error.appendPath(id)
-                    if (type == null) throw error
-                    const instance = type.default()
-                    this._cache.set(id, { instance, data, type })
+                    index++
+                    try {
+                        const { __type: typeID, id } = _PolymorphicGraphBase_t.deserialize(data)
+
+                        const type = this._types.get(typeID)
+                        if (type == null) {
+                            const error = new SerializationError(`Cannot find type "${typeID}"`)
+                            error.appendPath(id)
+                            throw error
+                        }
+
+                        const instance = type.default()
+                        this._cache.set(id, { instance, data, type })
+                    } catch (err) {
+                        if (err instanceof SerializationError) err.appendPath(index.toString())
+                        throw err
+                    }
                 }
 
+                index = -1
                 for (const { instance, data, type } of this._cache.values()) {
-                    Object.assign(instance, type.deserialize(data))
+                    index++
+                    try {
+                        Object.assign(instance, Struct.getBaseType(type).deserialize(data))
+                        if ("_postDeserialize" in instance) (instance as any)._postDeserialize()
+                    } catch (err) {
+                        if (err instanceof SerializationError) err.appendPath(index.toString())
+                        throw err
+                    }
                 }
 
                 return [...this._cache.values()].map(v => v.instance)
@@ -222,20 +284,77 @@ export namespace Struct {
         public serialize(objects: Iterable<T>) {
             if (this._cache != null) throw new Error("Cannot create context, context already exists")
             const result: any[] = []
+
             for (const object of objects) {
-                const type = getBaseType(object)
-                result.push(type.serialize(object))
+                result.push(this._ref.serialize(object))
             }
+
             return result
         }
 
-        public ref<U extends T>() {
-            return this._ref as Type<U>
+        public ref<U extends T = T>() {
+            return this._graphRef as Type<U>
+        }
+
+        public removeReferences(target: T, objects: Iterable<T>) {
+            const visit = (object: any, type: Type<any>, path: string) => {
+                if (Type.isNullable(type)) {
+                    if (object == null) return
+                    type = type.base
+                }
+
+                if (Type.isObject(type)) {
+                    for (const [key, propType] of type.propList) {
+                        const value = object[key]
+                        const newPath = path + key
+                        if (value == target) {
+                            if (Type.isNullable(propType)) {
+                                object[key] = null
+                            } else if (Type.isOptional(propType)) {
+                                object[key] = propType.default()
+                            } else throw new Error(`Cannot remove reference, property ${JSON.stringify(newPath)} is not nullable (${propType.name})`)
+                        } else {
+                            visit(value, propType, newPath)
+                        }
+                    }
+                } else if (Type.isMap(type)) {
+                    for (const [key, value] of [...object]) {
+                        const value = object[key]
+                        if (value == target) {
+                            object.delete(key)
+                        } else {
+                            visit(value, type.type, path + "." + key)
+                        }
+                    }
+                } else if (Type.isSet(type)) {
+                    for (const value of object.values()) {
+                        if (value == target) {
+                            object.delete(value)
+                        } else {
+                            visit(value, type.type, path + ".<value>")
+                        }
+                    }
+                } else if (Type.isArray(type)) {
+                    for (let i = 0; i < object.length; i++) {
+                        const value = object[i]
+                        if (value == target) {
+                            object.splice(i, 1)
+                            i--
+                        } else {
+                            visit(value, type.type, path + "." + i)
+                        }
+                    }
+                }
+            }
+
+            for (const object of objects) {
+                visit(object, Struct.getType(object), "")
+            }
         }
 
         constructor(
-            public readonly name: string
-        ) { }
+            name: string
+        ) { super(name) }
     }
 
     export function type(name: string) {
