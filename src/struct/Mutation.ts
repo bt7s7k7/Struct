@@ -46,179 +46,200 @@ export namespace Mutation {
         path: Type.string.as(Type.array)
     }) { }
 
+    const _PATH = Symbol.for("struct.mutation.path")
+    function _makeProxy(object: any, _type: Type<any>, path: string[], mutations: AnyMutation[]): any {
+        const type = Type.isNullable(_type) ? _type.base : _type
+
+        if (
+            !Type.isArray(type) &&
+            !Type.isObject(type) &&
+            !Type.isRecord(type) &&
+            !Type.isMap(type) &&
+            !Type.isSet(type)
+        ) {
+            return new Proxy(object, {
+                get(target, key, receiver) {
+                    if (key == _PATH) return path
+                    throw new Error("Cannot mutate a type that is not an object, array, set, map or record, " + type.name)
+                },
+                set() {
+                    throw new Error("Cannot mutate a type that is not an object, array, set, map or record, " + type.name)
+                },
+                deleteProperty() {
+                    throw new Error("Cannot mutate a type that is not an object, array, set, map or record, " + type.name)
+                },
+            })
+        }
+
+        return new Proxy(object, {
+            set(target, key, value, receiver) {
+                if (typeof key == "symbol") throw new Error("Cannot mutate a symbol indexed property")
+
+                if (target != DRY_MUTATION) if (!Reflect.set(target, key, value, receiver)) return false
+
+                const serializedValue = !Type.isObject(type) ? type.type.serialize(value) : type.props[key].serialize(value)
+
+                mutations.push(new AssignMutation({
+                    type: "mut_assign",
+                    value: serializedValue,
+                    path, key
+                }))
+
+                return true
+            },
+            deleteProperty(target, key) {
+                if (typeof key == "symbol") throw new Error("Cannot mutate a symbol indexed property")
+
+                if (target != DRY_MUTATION) if (!Reflect.deleteProperty(target, key)) return false
+
+                mutations.push(new DeleteMutation({
+                    type: "mut_delete",
+                    path, key
+                }))
+
+                return true
+            },
+            get(target, key, receiver) {
+                if (key == _PATH) return path
+                if (typeof key == "symbol") throw new Error("Cannot mutate a symbol indexed property")
+
+                if (Type.isArray(type)) {
+                    if (key == "length") return target.length
+
+                    const func = ({
+                        splice(start: number, deleteCount: number, ...items: any[]) {
+                            mutations.push(new SpliceMutation({
+                                type: "mut_splice",
+                                deleteCount, path,
+                                index: start,
+                                items: type.serialize(items)
+                            }))
+
+                            if (target != DRY_MUTATION) target.splice(start, deleteCount, ...items)
+                        },
+                        push(...items) {
+                            this.splice(this.length, 0, ...items)
+                        }
+                    } as Partial<any[]>)[key as any]
+
+                    if (func) return func
+
+                    if (key in []) throw new Error(`Unsupported array operation ${JSON.stringify(key)}`)
+                } else if (Type.isMap(type)) {
+                    if (key == "size") return target.size
+
+                    const func = (({
+                        set(key, value) {
+                            mutations.push(new AssignMutation({
+                                type: "mut_assign",
+                                path, key,
+                                value: type.type.serialize(value)
+                            }))
+
+                            if (target != DRY_MUTATION) target.set(key, value)
+                        },
+                        get(key) {
+                            const value = target != DRY_MUTATION ? target.get(key) : DRY_MUTATION
+                            return _makeProxy(value, type.type, [...path, key], [])
+                        },
+                        clear() {
+                            mutations.push(new SpliceMutation({
+                                type: "mut_splice",
+                                deleteCount: -1,
+                                index: 0,
+                                items: [],
+                                path,
+                            }))
+
+                            if (target != DRY_MUTATION) target.clear()
+                        },
+                        delete(key) {
+                            if (!target.has(key)) return false
+                            mutations.push(new DeleteMutation({
+                                type: "mut_delete",
+                                key, path,
+                            }))
+
+                            if (target != DRY_MUTATION) target.delete(key)
+                            return true
+                        }
+                    } as Partial<Map<string, any>>) as any)[key]
+
+                    if (func) return func
+
+                    throw new Error(`Unsupported map operation ${JSON.stringify(key)}`)
+                } else if (Type.isSet(type)) {
+                    if (key == "size") return target.size
+
+                    const func = (({
+                        add(value) {
+                            if (target.has(value)) return
+                            mutations.push(new SpliceMutation({
+                                type: "mut_splice",
+                                deleteCount: 0,
+                                index: 0,
+                                items: [
+                                    type.type.serialize(value)
+                                ],
+                                path,
+                            }))
+
+                            if (target != DRY_MUTATION) target.add(value)
+                        },
+                        clear() {
+                            mutations.push(new SpliceMutation({
+                                type: "mut_splice",
+                                deleteCount: -1,
+                                index: 0,
+                                items: [],
+                                path,
+                            }))
+
+                            if (target != DRY_MUTATION) target.clear()
+                        },
+                        delete(entry) {
+                            if (!target.has(entry)) return false
+                            const index = findSetEntryIndex(target, entry)
+                            if (index == undefined) throw new Error("Didn't find entry index, even though the set has it")
+
+                            mutations.push(new SpliceMutation({
+                                type: "mut_splice",
+                                index, path,
+                                deleteCount: 1,
+                                items: []
+                            }))
+
+                            if (target != DRY_MUTATION) target.delete(entry)
+                            return true
+                        }
+                    } as Partial<Set<any>>) as any)[key]
+
+                    if (func) return func
+
+                    throw new Error(`Unsupported map operation ${JSON.stringify(key)}`)
+                }
+
+                return _makeProxy(target != DRY_MUTATION ? Reflect.get(target, key, receiver) : DRY_MUTATION, Type.isObject(type) ? type.props[key] : type.type, [...path, key], [])
+            }
+        })
+    }
+
     export type AnyMutation = AssignMutation | SpliceMutation | DeleteMutation
 
     export function create<T>(target: T | null, baseType: Type<any>, thunk: (proxy: T) => void) {
         const mutations: AnyMutation[] = []
 
-        const makeProxy = (object: any, _type: Type<any>, path: string[]): any => {
-            const type = Type.isNullable(_type) ? _type.base : _type
-
-            if (
-                !Type.isArray(type) &&
-                !Type.isObject(type) &&
-                !Type.isRecord(type) &&
-                !Type.isMap(type) &&
-                !Type.isSet(type)
-            ) {
-                throw new Error("Cannot mutate a type that is not an object, array, set, map or record, " + type.name)
-            }
-
-            return new Proxy(object, {
-                set(target, key, value, receiver) {
-                    if (typeof key == "symbol") throw new Error("Cannon mutate a symbol indexed property")
-
-                    if (target != DRY_MUTATION) if (!Reflect.set(target, key, value, receiver)) return false
-
-                    const serializedValue = !Type.isObject(type) ? type.type.serialize(value) : type.props[key].serialize(value)
-
-                    mutations.push(new AssignMutation({
-                        type: "mut_assign",
-                        value: serializedValue,
-                        path, key
-                    }))
-
-                    return true
-                },
-                deleteProperty(target, key) {
-                    if (typeof key == "symbol") throw new Error("Cannon mutate a symbol indexed property")
-
-                    if (target != DRY_MUTATION) if (!Reflect.deleteProperty(target, key)) return false
-
-                    mutations.push(new DeleteMutation({
-                        type: "mut_delete",
-                        path, key
-                    }))
-
-                    return true
-                },
-                get(target, key, receiver) {
-                    if (typeof key == "symbol") throw new Error("Cannon mutate a symbol indexed property")
-
-                    if (Type.isArray(type)) {
-                        if (key == "length") return target.length
-
-                        const func = ({
-                            splice(start: number, deleteCount: number, ...items: any[]) {
-                                mutations.push(new SpliceMutation({
-                                    type: "mut_splice",
-                                    deleteCount, path,
-                                    index: start,
-                                    items: type.serialize(items)
-                                }))
-
-                                if (target != DRY_MUTATION) target.splice(start, deleteCount, ...items)
-                            },
-                            push(...items) {
-                                this.splice(this.length, 0, ...items)
-                            }
-                        } as Partial<any[]>)[key as any]
-
-                        if (func) return func
-
-                        if (key in []) throw new Error(`Unsupported array operation ${JSON.stringify(key)}`)
-                    } else if (Type.isMap(type)) {
-                        if (key == "size") return target.size
-
-                        const func = (({
-                            set(key, value) {
-                                mutations.push(new AssignMutation({
-                                    type: "mut_assign",
-                                    path, key,
-                                    value: type.type.serialize(value)
-                                }))
-
-                                if (target != DRY_MUTATION) target.set(key, value)
-                            },
-                            get(key) {
-                                const value = target != DRY_MUTATION ? target.get(key) : DRY_MUTATION
-                                return makeProxy(value, type.type, [...path, key])
-                            },
-                            clear() {
-                                mutations.push(new SpliceMutation({
-                                    type: "mut_splice",
-                                    deleteCount: -1,
-                                    index: 0,
-                                    items: [],
-                                    path,
-                                }))
-
-                                if (target != DRY_MUTATION) target.clear()
-                            },
-                            delete(key) {
-                                if (!target.has(key)) return false
-                                mutations.push(new DeleteMutation({
-                                    type: "mut_delete",
-                                    key, path,
-                                }))
-
-                                if (target != DRY_MUTATION) target.delete(key)
-                                return true
-                            }
-                        } as Partial<Map<string, any>>) as any)[key]
-
-                        if (func) return func
-
-                        throw new Error(`Unsupported map operation ${JSON.stringify(key)}`)
-                    } else if (Type.isSet(type)) {
-                        if (key == "size") return target.size
-
-                        const func = (({
-                            add(value) {
-                                if (target.has(value)) return
-                                mutations.push(new SpliceMutation({
-                                    type: "mut_splice",
-                                    deleteCount: 0,
-                                    index: 0,
-                                    items: [
-                                        type.type.serialize(value)
-                                    ],
-                                    path,
-                                }))
-
-                                if (target != DRY_MUTATION) target.add(value)
-                            },
-                            clear() {
-                                mutations.push(new SpliceMutation({
-                                    type: "mut_splice",
-                                    deleteCount: -1,
-                                    index: 0,
-                                    items: [],
-                                    path,
-                                }))
-
-                                if (target != DRY_MUTATION) target.clear()
-                            },
-                            delete(entry) {
-                                if (!target.has(entry)) return false
-                                const index = findSetEntryIndex(target, entry)
-                                if (index == undefined) throw new Error("Didn't find entry index, even though the set has it")
-
-                                mutations.push(new SpliceMutation({
-                                    type: "mut_splice",
-                                    index, path,
-                                    deleteCount: 1,
-                                    items: []
-                                }))
-
-                                if (target != DRY_MUTATION) target.delete(entry)
-                                return true
-                            }
-                        } as Partial<Set<any>>) as any)[key]
-
-                        if (func) return func
-
-                        throw new Error(`Unsupported map operation ${JSON.stringify(key)}`)
-                    }
-
-                    return makeProxy(target != DRY_MUTATION ? Reflect.get(target, key, receiver) : DRY_MUTATION, Type.isObject(type) ? type.props[key] : type.type, [...path, key])
-                }
-            })
-        }
-
-        thunk(makeProxy(target ?? DRY_MUTATION, baseType, []))
+        thunk(_makeProxy(target ?? DRY_MUTATION, baseType, [], mutations))
 
         return mutations
+    }
+
+    export type TypedPath<T = any> = T extends string | number | boolean | symbol | null | void | undefined ? T & { [_PATH]: string[] } : { [P in keyof T]: TypedPath<T[P]> } & { [_PATH]: string[] }
+    export function getPath(path: TypedPath) {
+        return path[_PATH]
+    }
+    export function typedPath<T>(baseType: Type<T>) {
+        return _makeProxy(DRY_MUTATION, baseType, [], []) as TypedPath<T>
     }
 
     export function apply(target: any, type: Type<any> | null, mutation: AnyMutation) {
