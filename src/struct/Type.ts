@@ -119,6 +119,7 @@ const IS_OBJECT = Symbol.for("struct.isObject")
 const IS_NULLABLE = Symbol.for("struct.isNullable")
 const IS_OPTIONAL = Symbol.for("struct.isOptional")
 const IS_KEY_VALUE_PAIR = Symbol.for("struct.isKeyValuePair")
+const METADATA = Symbol.for("struct.metadata")
 
 export interface TypeValuePair {
     type: Type<any>
@@ -189,6 +190,18 @@ export namespace Type {
     export const isNullable = (type: Type<any>): type is NullableType<any> => IS_NULLABLE in type
     export const isOptional = (type: Type<any>): type is OptionalType<any> => IS_OPTIONAL in type
     export const isKeyValuePair = (type: Type<any>): type is KeyValuePair<any> => IS_KEY_VALUE_PAIR in type
+
+    export function getMetadata(type: Type<any>) {
+        if (METADATA in type) {
+            return type[METADATA] as {
+                get<T extends new (...args: any) => any>(type: T): InstanceType<T> | undefined
+                has(type: new (...args: any) => any): boolean
+                [Symbol.iterator](): IterableIterator<[new (...args: any) => any, any]>
+            }
+        } else {
+            return null
+        }
+    }
 
     export interface ArrayType<T = any> extends Type<T[]> {
         [IS_ARRAY]: true
@@ -436,10 +449,7 @@ export namespace Type {
     })
 
     export const optional = <T>(type: Type<T>, defaultValue: (() => T) | null = null) => extendType<Type.OptionalType<T>, T>({
-        name: type.name,
-        default: type.default,
-        serialize: type.serialize,
-        getDefinition: type.getDefinition,
+        ...type,
         deserialize(source) {
             if (source == null) {
                 if (defaultValue) {
@@ -490,7 +500,7 @@ export namespace Type {
         return Type.namedType("Partial<" + type.name + ">", Object.fromEntries(type.propList.map(([key, value]) => [key, isNullable(value) ? value : Type.nullable(value)]))) as Type<Partial<T>>
     }
 
-    export const recursive = <T extends any>(thunk: () => Type<T>): Type<T> => {
+    export const recursive = <T>(thunk: () => Type<T>): Type<T> => {
         let instance: Type<T> | null = null
 
         return {
@@ -708,6 +718,16 @@ export namespace Type {
     }
 
     export const EMPTY_ACTION = action(empty, empty)
+
+    export function annotate<T extends Type<any>>(type: T, ...metadata: any[]): T {
+        const newMetadata = metadata.map(v => [v.constructor, v] as const)
+        const existingMetadata = Type.getMetadata(type)
+        if (existingMetadata) {
+            return { ...type, [METADATA]: new Map([...existingMetadata, ...newMetadata]) }
+        } else {
+            return { ...type, [METADATA]: new Map(newMetadata) }
+        }
+    }
 }
 
 type _Enum = typeof Type.stringUnion
