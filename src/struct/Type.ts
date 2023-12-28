@@ -728,6 +728,21 @@ export namespace Type {
             return { ...type, [METADATA]: new Map(newMetadata) }
         }
     }
+
+    export function withDefault<T extends Type<any>>(type: T, factory: (prev: T["default"]) => ReturnType<T["default"]>): T {
+        const prev = type.default
+        return { ...type, default: () => factory(prev) }
+    }
+
+    export function pick<T, K extends keyof T>(type: Type<T>, ...picks: K[]) {
+        if (!Type.isObject(type)) throw new Error("Type.pick must be used on an object type")
+        return Type.object(Object.fromEntries(picks.map(key => [key, type.props[key as string]] as const))) as Type<Pick<T, K>>
+    }
+
+    export function omit<T, K extends keyof T>(type: Type<T>, ...omits: K[]) {
+        if (!Type.isObject(type)) throw new Error("Type.omit must be used on an object type")
+        return Type.object(Object.fromEntries(Object.entries(type.props).filter(([key, value]) => !omits.includes(key as any)))) as Type<Omit<T, K>>
+    }
 }
 
 type _Enum = typeof Type.stringUnion
