@@ -421,10 +421,15 @@ export namespace Type {
 
     export const objectWithClass = <T extends object>(ctor: new (...args: any[]) => T, name: string, props: Record<string, Type<any>>, options: { default?: () => T } = {}) => {
         const type = makeObject(name, props) as unknown as Type<T>
-        if (options.default) type.default = options.default
+        if (options.default) {
+            type.default = options.default
+        } else {
+            const oldDefault = type.default
+            type.default = () => Object.assign(new ctor(), oldDefault.call(type))
+        }
         const oldDeserialize = type.deserialize
         type.deserialize = (source) => {
-            return Object.assign(new ctor(), oldDeserialize(source))
+            return Object.assign(new ctor(), oldDeserialize.call(type, source))
         }
 
         return type
