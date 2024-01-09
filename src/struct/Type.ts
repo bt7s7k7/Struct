@@ -85,6 +85,10 @@ function makeObject<T extends Record<string, Type<any>>>(name: string, props: T)
             const ret: Record<string, any> = {}
 
             for (const [key, value] of propList) {
+                if (Type.isNullable(value) && value.skipNullSerialize && (source as any)[key] == null) {
+                    continue
+                }
+
                 SerializationError.catch(key, () => ret[key] = value.serialize((source as any)[key]))
             }
 
@@ -237,6 +241,7 @@ export namespace Type {
     export interface NullableType<T = any> extends Type<T | null> {
         [IS_NULLABLE]: true
         base: Type<T>
+        skipNullSerialize: boolean
     }
 
     export interface OptionalType<T = any> extends Type<T> {
@@ -435,7 +440,7 @@ export namespace Type {
         return type
     }
 
-    export const nullable = <T>(type: Type<T>) => extendType<Type.NullableType<T>, T | null>({
+    export const nullable = <T>(type: Type<T>, { skipNullSerialize = false } = {}) => extendType<Type.NullableType<T>, T | null>({
         name: type.name + "?",
         default: () => null,
         getDefinition(indent) {
@@ -450,7 +455,7 @@ export namespace Type {
             else return type.deserialize(source)
         },
         [IS_NULLABLE]: true,
-        base: type
+        base: type, skipNullSerialize
     })
 
     export const optional = <T>(type: Type<T>, defaultValue: (() => T) | null = null) => extendType<Type.OptionalType<T>, T>({
