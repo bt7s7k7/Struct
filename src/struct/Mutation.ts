@@ -25,12 +25,20 @@ function findSetEntryIndex<T>(set: Set<T>, target: T) {
 const DRY_MUTATION = {}
 
 export namespace Mutation {
+    abstract class _AnyMutation {
+        public isLocal = false
+        public setLocal(): this {
+            this.isLocal = true
+            return this
+        }
+    }
+
     export class AssignMutation extends Struct.define("AssignMutation", {
         type: Type.enum("mut_assign"),
         value: Type.passthrough<any>(null),
         key: Type.string,
         path: Type.string.as(Type.array)
-    }) { }
+    }, _AnyMutation) { }
 
     export class SpliceMutation extends Struct.define("SpliceMutation", {
         type: Type.enum("mut_splice"),
@@ -38,13 +46,15 @@ export namespace Mutation {
         deleteCount: Type.number,
         items: Type.passthrough<any>(null).as(Type.array),
         path: Type.string.as(Type.array)
-    }) { }
+    }, _AnyMutation) { }
 
     export class DeleteMutation extends Struct.define("DeleteMutation", {
         type: Type.enum("mut_delete"),
         key: Type.string,
         path: Type.string.as(Type.array)
-    }) { }
+    }, _AnyMutation) { }
+
+    export type AnyMutation = AssignMutation | SpliceMutation | DeleteMutation
 
     const _PATH = Symbol.for("struct.mutation.path")
     function _makeProxy(object: any, _type: Type<any>, path: string[], mutations: AnyMutation[]): any {
@@ -83,7 +93,7 @@ export namespace Mutation {
                     type: "mut_assign",
                     value: serializedValue,
                     path, key
-                }))
+                }).setLocal())
 
                 return true
             },
@@ -95,7 +105,7 @@ export namespace Mutation {
                 mutations.push(new DeleteMutation({
                     type: "mut_delete",
                     path, key
-                }))
+                }).setLocal())
 
                 return true
             },
@@ -113,7 +123,7 @@ export namespace Mutation {
                                 deleteCount, path,
                                 index: start,
                                 items: type.serialize(items)
-                            }))
+                            }).setLocal())
 
                             if (target != DRY_MUTATION) target.splice(start, deleteCount, ...items)
                         },
@@ -134,7 +144,7 @@ export namespace Mutation {
                                 type: "mut_assign",
                                 path, key,
                                 value: type.type.serialize(value)
-                            }))
+                            }).setLocal())
 
                             if (target != DRY_MUTATION) target.set(key, value)
                         },
@@ -149,7 +159,7 @@ export namespace Mutation {
                                 index: 0,
                                 items: [],
                                 path,
-                            }))
+                            }).setLocal())
 
                             if (target != DRY_MUTATION) target.clear()
                         },
@@ -158,7 +168,7 @@ export namespace Mutation {
                             mutations.push(new DeleteMutation({
                                 type: "mut_delete",
                                 key, path,
-                            }))
+                            }).setLocal())
 
                             if (target != DRY_MUTATION) target.delete(key)
                             return true
@@ -182,7 +192,7 @@ export namespace Mutation {
                                     type.type.serialize(value)
                                 ],
                                 path,
-                            }))
+                            }).setLocal())
 
                             if (target != DRY_MUTATION) target.add(value)
                         },
@@ -193,7 +203,7 @@ export namespace Mutation {
                                 index: 0,
                                 items: [],
                                 path,
-                            }))
+                            }).setLocal())
 
                             if (target != DRY_MUTATION) target.clear()
                         },
@@ -207,7 +217,7 @@ export namespace Mutation {
                                 index, path,
                                 deleteCount: 1,
                                 items: []
-                            }))
+                            }).setLocal())
 
                             if (target != DRY_MUTATION) target.delete(entry)
                             return true
@@ -223,8 +233,6 @@ export namespace Mutation {
             }
         })
     }
-
-    export type AnyMutation = AssignMutation | SpliceMutation | DeleteMutation
 
     export function create<T>(target: T | null, baseType: Type<any>, thunk: (proxy: T) => void) {
         const mutations: AnyMutation[] = []
@@ -274,18 +282,19 @@ export namespace Mutation {
                 receiver[mutation.key] = mutation.value
             } else if (Type.isObject(type) || Type.isArray(type) || Type.isRecord(type)) {
                 const valueType = Type.isObject(type) ? type.props[mutation.key] : type.type
-                receiver[mutation.key] = valueType.deserialize(mutation.value)
+                receiver[mutation.key] = mutation.isLocal ? mutation.value : valueType.deserialize(mutation.value)
             } else if (Type.isMap(type)) {
-                receiver.set(mutation.key, type.type.deserialize(mutation.value))
+                receiver.set(mutation.key, mutation.isLocal ? mutation.value : type.type.deserialize(mutation.value))
             } else throw new Error("Cannot use assign on type " + type.name)
         } else if (mutation.type == "mut_splice") {
             if (type == null) {
                 receiver.splice(mutation.index, mutation.deleteCount, ...mutation.items)
             } else if (Type.isArray(type)) {
-                receiver.splice(mutation.index, mutation.deleteCount, ...type.deserialize(mutation.items))
+                const items = mutation.isLocal ? mutation.items : type.deserialize(mutation.items)
+                receiver.splice(mutation.index, mutation.deleteCount, ...items)
             } else if (Type.isSet(type)) {
                 if (mutation.deleteCount == -1) receiver.clear()
-                else if (mutation.index == 0 && mutation.deleteCount == 0) receiver.add(type.deserialize(mutation.items[0]))
+                else if (mutation.index == 0 && mutation.deleteCount == 0) receiver.add(mutation.isLocal ? mutation.items[0] : type.deserialize(mutation.items[0]))
                 else if (mutation.deleteCount == 1) receiver.delete(getSetEntryAtIndex(receiver, mutation.index))
                 else throw new Error(`Invalid set message (index = ${mutation.index}; deleteCount = ${mutation.deleteCount})`)
             } else if (Type.isMap(type)) {
