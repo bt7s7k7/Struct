@@ -237,7 +237,7 @@ export namespace Struct {
                 if (this._cache == null) throw new SerializationError("Cannot deserialize polymorphic graph reference outside of context")
                 const target = this._cache.get(id)
                 if (target == null) throw new SerializationError(`Cannot resolve reference to "${id}"`)
-                return target
+                return target.instance
             }
         })
 
