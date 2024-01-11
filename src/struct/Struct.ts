@@ -228,25 +228,36 @@ export namespace Struct {
 
     const _PolymorphicGraphBase_t = Type.object({ __type: Type.string, id: Type.string })
     export class PolymorphicGraphSerializer<T extends { id: string }> extends PolymorphicSerializer<T> {
-        protected _cache: Map<string, { instance: T, type: Type<any>, data: any }> | null = null
+        protected _contextGetter: ((id: string) => any | null | undefined) | null = null
         protected _graphRef = Type.createType({
             name: this.name,
             default: () => null,
             serialize: v => v.id,
             deserialize: (id) => {
-                if (this._cache == null) throw new SerializationError("Cannot deserialize polymorphic graph reference outside of context")
-                const target = this._cache.get(id)
+                if (this._contextGetter == null) throw new SerializationError("Cannot deserialize polymorphic graph reference outside of context")
+                const target = this._contextGetter(id)
                 if (target == null) throw new SerializationError(`Cannot resolve reference to "${id}"`)
-                return target.instance
+                return target
             }
         })
 
         public get base() { return this._graphRef as Type<T> }
 
-        public deserialize(objectsData: Iterable<any>) {
-            if (this._cache != null) throw new Error("Cannot create context, context already exists")
+        public createContext(getter: (id: string) => any | null | undefined, thunk: () => void) {
+            if (this._contextGetter != null) throw new Error("Cannot create context, context already exists")
             try {
-                this._cache = new Map()
+                this._contextGetter = getter
+                thunk()
+            } finally {
+                this._contextGetter = null
+            }
+        }
+
+        public deserialize(objectsData: Iterable<any>) {
+            if (this._contextGetter != null) throw new Error("Cannot create context, context already exists")
+            try {
+                const cache = new Map<string, { instance: T, type: Type<any>, data: any }>()
+                this._contextGetter = id => cache.get(id)?.instance
                 let index = -1
                 for (let data of objectsData) {
                     index++
@@ -261,7 +272,7 @@ export namespace Struct {
                         }
 
                         const instance = type.default()
-                        this._cache.set(id, { instance, data, type })
+                        cache.set(id, { instance, data, type })
                     } catch (err) {
                         if (err instanceof SerializationError) err.appendPath(index.toString())
                         throw err
@@ -269,7 +280,7 @@ export namespace Struct {
                 }
 
                 index = -1
-                for (const { instance, data, type } of this._cache.values()) {
+                for (const { instance, data, type } of cache.values()) {
                     index++
                     try {
                         Object.assign(instance, Struct.getBaseType(type).deserialize(data))
@@ -280,14 +291,13 @@ export namespace Struct {
                     }
                 }
 
-                return [...this._cache.values()].map(v => v.instance)
+                return [...cache.values()].map(v => v.instance)
             } finally {
-                this._cache = null
+                this._contextGetter = null
             }
         }
 
         public serialize(objects: Iterable<T>) {
-            if (this._cache != null) throw new Error("Cannot create context, context already exists")
             const result: any[] = []
 
             for (const object of objects) {
