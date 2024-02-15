@@ -1,3 +1,4 @@
+import { unreachable } from "../comTypes/util"
 import { Type } from "../struct/Type"
 import { Struct } from "./Struct"
 
@@ -55,6 +56,11 @@ export namespace Mutation {
     }, _AnyMutation) { }
 
     export type AnyMutation = AssignMutation | SpliceMutation | DeleteMutation
+    export const AnyMutation_t = Type.byKeyUnion("AnyMutation", "type", {
+        "mut_assign": AssignMutation.ref(),
+        "mut_splice": SpliceMutation.ref(),
+        "mut_delete": DeleteMutation.ref()
+    }, () => unreachable())
 
     const _PATH = Symbol.for("struct.mutation.path")
     function _makeProxy(object: any, _type: Type<any>, path: string[], mutations: AnyMutation[]): any {
