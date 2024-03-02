@@ -39,11 +39,11 @@ export namespace StructSyncMessages {
         track: boolean
     }
 
-    export interface AssignMutateMessage extends MutateMessageBase, Omit<Mutation.AssignMutation, "serialize"> { }
+    export interface AssignMutateMessage extends MutateMessageBase, Omit<Mutation.AssignMutation, "serialize" | "setLocal" | "isLocal"> { }
 
-    export interface SpliceMutateMessage extends MutateMessageBase, Omit<Mutation.SpliceMutation, "serialize"> { }
+    export interface SpliceMutateMessage extends MutateMessageBase, Omit<Mutation.SpliceMutation, "serialize" | "setLocal" | "isLocal"> { }
 
-    export interface DeleteMutateMessage extends MutateMessageBase, Omit<Mutation.DeleteMutation, "serialize"> { }
+    export interface DeleteMutateMessage extends MutateMessageBase, Omit<Mutation.DeleteMutation, "serialize" | "setLocal" | "isLocal"> { }
 
     export interface EventMessage extends ControllerMessageBase {
         type: "event"

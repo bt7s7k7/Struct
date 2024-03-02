@@ -63,10 +63,11 @@ export namespace Mutation {
     }, () => unreachable())
 
     const _PATH = Symbol.for("struct.mutation.path")
-    function _makeProxy(object: any, _type: Type<any>, path: string[], mutations: AnyMutation[]): any {
-        const type = Type.isNullable(_type) ? _type.base : _type
+    function _makeProxy(object: any, _type: Type<any> | null, path: string[], mutations: AnyMutation[]): any {
+        const type = _type == null ? null : Type.isNullable(_type) ? _type.base : _type
 
         if (
+            type != null &&
             !Type.isArray(type) &&
             !Type.isObject(type) &&
             !Type.isRecord(type) &&
@@ -93,7 +94,7 @@ export namespace Mutation {
 
                 if (target != DRY_MUTATION) if (!Reflect.set(target, key, value, receiver)) return false
 
-                const serializedValue = !Type.isObject(type) ? type.type.serialize(value) : type.props[key].serialize(value)
+                const serializedValue = type == null ? value : !Type.isObject(type) ? type.type.serialize(value) : type.props[key].serialize(value)
 
                 mutations.push(new AssignMutation({
                     type: "mut_assign",
@@ -119,7 +120,7 @@ export namespace Mutation {
                 if (key == _PATH) return path
                 if (typeof key == "symbol") throw new Error("Cannot mutate a symbol indexed property")
 
-                if (Type.isArray(type)) {
+                if (type == null ? target instanceof Array : Type.isArray(type)) {
                     if (key == "length") return target.length
 
                     const func = ({
@@ -128,7 +129,7 @@ export namespace Mutation {
                                 type: "mut_splice",
                                 deleteCount, path,
                                 index: start,
-                                items: type.serialize(items)
+                                items: type == null ? items : (type as Type.ArrayType).serialize(items)
                             }).setLocal())
 
                             if (target != DRY_MUTATION) target.splice(start, deleteCount, ...items)
@@ -141,7 +142,7 @@ export namespace Mutation {
                     if (func) return func
 
                     if (key in []) throw new Error(`Unsupported array operation ${JSON.stringify(key)}`)
-                } else if (Type.isMap(type)) {
+                } else if (type == null ? target instanceof Map : Type.isMap(type)) {
                     if (key == "size") return target.size
 
                     const func = (({
@@ -149,14 +150,14 @@ export namespace Mutation {
                             mutations.push(new AssignMutation({
                                 type: "mut_assign",
                                 path, key,
-                                value: type.type.serialize(value)
+                                value: type == null ? value : type.serialize(value)
                             }).setLocal())
 
                             if (target != DRY_MUTATION) target.set(key, value)
                         },
                         get(key) {
                             const value = target != DRY_MUTATION ? target.get(key) : DRY_MUTATION
-                            return _makeProxy(value, type.type, [...path, key], [])
+                            return _makeProxy(value, type == null ? null : (type as Type.MapType).type, [...path, key], mutations)
                         },
                         clear() {
                             mutations.push(new SpliceMutation({
@@ -184,7 +185,7 @@ export namespace Mutation {
                     if (func) return func
 
                     throw new Error(`Unsupported map operation ${JSON.stringify(key)}`)
-                } else if (Type.isSet(type)) {
+                } else if (type == null ? target instanceof Set : Type.isSet(type)) {
                     if (key == "size") return target.size
 
                     const func = (({
@@ -195,7 +196,7 @@ export namespace Mutation {
                                 deleteCount: 0,
                                 index: 0,
                                 items: [
-                                    type.type.serialize(value)
+                                    type == null ? value : (type as Type.SetType).type.serialize(value)
                                 ],
                                 path,
                             }).setLocal())
@@ -235,12 +236,13 @@ export namespace Mutation {
                     throw new Error(`Unsupported map operation ${JSON.stringify(key)}`)
                 }
 
-                return _makeProxy(target != DRY_MUTATION ? Reflect.get(target, key, receiver) : DRY_MUTATION, Type.isObject(type) ? type.props[key] : type.type, [...path, key], [])
+                const propertyType = type == null ? null : Type.isObject(type) ? type.props[key] : type.type
+                return _makeProxy(target != DRY_MUTATION ? Reflect.get(target, key, receiver) : DRY_MUTATION, propertyType, [...path, key], mutations)
             }
         })
     }
 
-    export function create<T>(target: T | null, baseType: Type<any>, thunk: (proxy: T) => void) {
+    export function create<T>(target: T | null, baseType: Type<any> | null, thunk: (proxy: T) => void) {
         const mutations: AnyMutation[] = []
 
         thunk(_makeProxy(target ?? DRY_MUTATION, baseType, [], mutations))
