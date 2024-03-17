@@ -1,6 +1,8 @@
-import { unreachable } from "../comTypes/util"
-import { Type } from "../struct/Type"
+import { GenericParser } from "../comTypes/GenericParser"
 import { Struct } from "./Struct"
+import { Type } from "./Type"
+
+new GenericParser("test").consume("fff")
 
 function getSetEntryAtIndex<T>(set: Set<T>, index: number) {
     let i = 0
@@ -60,7 +62,7 @@ export namespace Mutation {
         "mut_assign": AssignMutation.ref(),
         "mut_splice": SpliceMutation.ref(),
         "mut_delete": DeleteMutation.ref()
-    }, () => unreachable())
+    }, () => { throw new Error("Cannot create a default AnyMutation_t") })
 
     const _PATH = Symbol.for("struct.mutation.path")
     function _makeProxy(object: any, _type: Type<any> | null, path: string[], mutations: AnyMutation[]): any {
