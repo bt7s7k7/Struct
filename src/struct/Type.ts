@@ -194,6 +194,11 @@ export namespace Type {
     export const isNullable = (type: Type<any>): type is NullableType<any> => IS_NULLABLE in type
     export const isOptional = (type: Type<any>): type is OptionalType<any> => IS_OPTIONAL in type
     export const isKeyValuePair = (type: Type<any>): type is KeyValuePair<any> => IS_KEY_VALUE_PAIR in type
+    export const isType = (value: unknown): value is Type<any> => (
+        (typeof value == "object" || typeof value == "function") && value != null
+        && "serialize" in value && "deserialize" in value
+        && "name" in value && "default" in value && "as" in value
+    )
 
     export function getMetadata(type: Type<any>) {
         if (METADATA in type) {
