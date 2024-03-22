@@ -254,9 +254,12 @@ export namespace Mutation {
 
     export type TypedPath<T = any> = T extends string | number | boolean | symbol | null | void | undefined ? T & { [_PATH]: string[] } : { [P in keyof T]: TypedPath<T[P]> } & { [_PATH]: string[] }
     export function getPath(path: TypedPath) {
-        return path[_PATH]
+        return path[_PATH] as string[]
     }
-    export function typedPath<T>(baseType: Type<T>) {
+
+    export function typedPath<T>(baseType: Type<T>): TypedPath<T>
+    export function typedPath(baseType: null): TypedPath<any>
+    export function typedPath<T>(baseType: Type<T> | null) {
         return _makeProxy(DRY_MUTATION, baseType, [], []) as TypedPath<T>
     }
 
