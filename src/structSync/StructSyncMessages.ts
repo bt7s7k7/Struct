@@ -1,4 +1,3 @@
-import { Mutation } from "../struct/Mutation"
 import { StructSyncClient } from "./StructSyncClient"
 import { StructSyncSession } from "./StructSyncSession"
 
@@ -24,10 +23,6 @@ export namespace StructSyncMessages {
         target: string
     }
 
-    interface MutateMessageBase extends ControllerMessageBase {
-        path: string[]
-    }
-
     export interface ActionCallMessage extends ControllerMessageBase {
         type: "action"
         action: string
@@ -39,11 +34,9 @@ export namespace StructSyncMessages {
         track: boolean
     }
 
-    export interface AssignMutateMessage extends MutateMessageBase, Omit<Mutation.AssignMutation, "serialize" | "setLocal" | "isLocal"> { }
-
-    export interface SpliceMutateMessage extends MutateMessageBase, Omit<Mutation.SpliceMutation, "serialize" | "setLocal" | "isLocal"> { }
-
-    export interface DeleteMutateMessage extends MutateMessageBase, Omit<Mutation.DeleteMutation, "serialize" | "setLocal" | "isLocal"> { }
+    export interface MutateMessage extends ControllerMessageBase {
+        type: "mutate"
+    }
 
     export interface EventMessage extends ControllerMessageBase {
         type: "event"
@@ -52,7 +45,6 @@ export namespace StructSyncMessages {
 
     }
 
-    export type AnyMutateMessage = AssignMutateMessage | SpliceMutateMessage | DeleteMutateMessage
-    export type AnyProxyMessage = AnyMutateMessage | EventMessage | MetaMessage
+    export type AnyProxyMessage = MutateMessage | EventMessage | MetaMessage
     export type AnyControllerMessage = ActionCallMessage | FindControllerMessage | MetaMessage
 }

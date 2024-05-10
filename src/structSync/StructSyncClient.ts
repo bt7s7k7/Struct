@@ -3,7 +3,7 @@ import { DIService } from "../dependencyInjection/DIService"
 import { MessageBridge } from "../dependencyInjection/commonServices/MessageBridge"
 import { DISPOSE } from "../eventLib/Disposable"
 import { EventListener } from "../eventLib/EventListener"
-import { Mutation } from "../struct/Mutation"
+import { Mutation, Mutation_t } from "../struct/Mutation"
 import { Struct } from "../struct/Struct"
 import { MetaMessageType } from "./MetaMessageType"
 import { StructProxy } from "./StructSyncContract"
@@ -89,11 +89,12 @@ export class StructSyncClient extends DIService.define() {
                     }
                 }
 
-                if (msg.type == "mut_assign" || msg.type == "mut_delete" || msg.type == "mut_splice") {
+                if (msg.type == "mutate") {
+                    const mutation = Mutation_t.base.deserialize(msg)
                     const proxies = this.trackedLookup[msg.target]
                     if (proxies) proxies.forEach(proxy => {
-                        proxy.onMutate.emit(msg)
-                        Mutation.apply(proxy, Struct.getBaseType(proxy), msg)
+                        proxy.onMutate.emit(mutation)
+                        Mutation.apply(proxy, Struct.getBaseType(proxy), mutation)
                     })
                 } else if (msg.type == "event") {
                     const proxies = this.trackedLookup[msg.target]

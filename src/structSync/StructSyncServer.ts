@@ -36,7 +36,7 @@ export class StructSyncServer extends DIService.define() {
         else this.sessions.add(session)
     }
 
-    public async notifyMutation(mutation: StructSyncMessages.AnyMutateMessage) {
+    public async notifyMutation(mutation: StructSyncMessages.MutateMessage) {
         await Promise.all([...this.sessions.values()].map(session => session.notifyMutation(mutation)))
     }
 

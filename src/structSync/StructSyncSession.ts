@@ -23,7 +23,7 @@ export class StructSyncSession extends EventListener {
         this.server.attachSession(this, "remove")
     }
 
-    public async notifyMutation(mutation: StructSyncMessages.AnyMutateMessage) {
+    public async notifyMutation(mutation: StructSyncMessages.MutateMessage) {
         await this.sendMessage(mutation)
     }
 

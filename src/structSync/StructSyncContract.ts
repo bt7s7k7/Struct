@@ -93,7 +93,7 @@ export namespace StructSyncContract {
 
                         const self = new.target[INSTANCE_DECORATOR] != null ? new.target[INSTANCE_DECORATOR]!(this) : this
 
-                        self.onMutate = new EventEmitter<StructSyncMessages.AnyMutateMessage>()
+                        self.onMutate = new EventEmitter<Mutation>()
 
                         for (const [key, action] of actionsList) {
                             ((self as any)[key] as any) = async (arg: any) => {
@@ -132,7 +132,7 @@ export namespace StructSyncContract {
 
                     public getWeakRef = implementEventListener(this)
 
-                    public readonly onMutate = new EventEmitter<StructSyncMessages.AnyMutateMessage>()
+                    public readonly onMutate = new EventEmitter<Mutation>()
 
                     public [DISPOSE]() {
                         this[SERVER]?.unregister(makeFullID((this as any).id, name))
@@ -150,7 +150,7 @@ export namespace StructSyncContract {
                         return this.impl
                     }
 
-                    public async mutate(thunk: ((proxy: any) => void) | StructSyncMessages.AnyMutateMessage) {
+                    public async mutate(thunk: ((proxy: any) => void) | Mutation) {
                         const fullName = makeFullID((this as any).id, name)
 
                         if (typeof thunk != "function") {
@@ -158,14 +158,20 @@ export namespace StructSyncContract {
                         }
 
                         const mutations = typeof thunk == "function" ? (
-                            Mutation.create(this, base.baseType, thunk).map(v => ({ ...v, target: fullName }))
+                            Mutation.create(this, base.baseType, thunk as (proxy: any) => void)
                         ) : (
-                            [{ ...thunk, target: fullName }]
+                            [thunk]
                         )
 
                         if (this[SERVER]) for (const mutation of mutations) {
+                            const mutationMessage: StructSyncMessages.MutateMessage = {
+                                type: "mutate",
+                                target: fullName,
+                                ...mutation.serialize()
+                            }
+
                             this.onMutate.emit(mutation)
-                            await this[SERVER]!.notifyMutation(mutation)
+                            await this[SERVER]!.notifyMutation(mutationMessage)
                         }
                     }
 
@@ -252,7 +258,7 @@ export type StructProxy<
     ActionType.Functions<A> &
     IDisposable &
     {
-        onMutate: EventEmitter<StructSyncMessages.AnyMutateMessage>
+        onMutate: EventEmitter<Mutation>
         emitEvent(event: string, payload: any): void
         synchronize(): Promise<void>,
         [StructSyncContract.SERVICE]: StructSyncClient
@@ -265,10 +271,10 @@ export type StructController<
 > = InstanceType<T> &
     EventType.Emitters<E> &
     {
-        onMutate: EventEmitter<StructSyncMessages.AnyMutateMessage>
+        onMutate: EventEmitter<Mutation>
         impl(impl: ActionType.FunctionsImpl<A>): StructController<T, A>["impl"]
         runAction<K extends keyof A>(name: K, argument: Parameters<ActionType.Functions<A>[K]>[0], meta: StructSyncMessages.MetaHandle): ReturnType<ActionType.Functions<A>[K]>
-        mutate<T>(this: T, thunk: ((v: T) => void) | StructSyncMessages.AnyMutateMessage): Promise<void>
+        mutate<T>(this: T, thunk: ((v: T) => void) | Mutation): Promise<void>
         register<T>(this: T, server?: StructSyncServer): T,
         [StructSyncContract.SERVER]: StructSyncServer | null
     } & IEventListener
