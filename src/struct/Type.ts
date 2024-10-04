@@ -1010,7 +1010,7 @@ export namespace Type {
         }
 
         constructor(
-            public readonly entries: T[]
+            public readonly entries: readonly T[]
         ) { super() }
     }
 
