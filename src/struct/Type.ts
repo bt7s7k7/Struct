@@ -420,7 +420,7 @@ export namespace Type {
         protected _deserialize(handle: any, deserializer: Deserializer<unknown, unknown, unknown, unknown>): void { }
 
         constructor() { super("empty", null as unknown as void) }
-    }
+    } as PrimitiveType<void>
 
 
 
