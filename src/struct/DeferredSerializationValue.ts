@@ -16,7 +16,7 @@ class _DeferredSerializationValueType extends Type<DeferredSerializationValue> {
     }
 
     protected _deserialize(handle: any, deserializer: Deserializer): DeferredSerializationValue {
-        return DeferredSerializationValue.fromHandle(handle, deserializer)
+        return DeferredSerializationValue.prepareDeserialization(handle, deserializer)
     }
 
     public readonly name = "DeferredSerializationValue"
@@ -61,19 +61,22 @@ export class DeferredSerializationValue {
         public readonly deserializer: Deserializer | null
     ) { }
 
-    public static fromTypedValue(value: any, type: Type) {
+    /** Use this to prepare for serialization of values with known types */
+    public static prepareSerialization(value: any, type: Type) {
         return new DeferredSerializationValue(value, type, null)
     }
 
-    public static fromUntypedValue(value: any) {
+    /** Use this to prepare for serialization of values with unknown types */
+    public static prepareSerializationUntyped(value: any) {
         return new DeferredSerializationValue(value, null, null)
     }
 
-    public static fromHandle(handle: any, deserializer: Deserializer) {
+    /** Use this to prepare for deserialization */
+    public static prepareDeserialization(handle: any, deserializer: Deserializer) {
         return new DeferredSerializationValue(handle, null, deserializer)
     }
 
-    public static readonly null = this.fromTypedValue(null, Type.empty)
+    public static readonly null = this.prepareSerialization(null, Type.empty)
 
     public static ref() {
         return _DEFERRED_VALUE_TYPE as Type<DeferredSerializationValue>
