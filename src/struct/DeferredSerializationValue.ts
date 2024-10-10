@@ -43,6 +43,8 @@ export class DeferredSerializationValue {
      * If type is `null`, deserialization proceeds using {@link Deserializer.parseAny}. If this instance
      * is not a result of deserialization, its value is returned.
      * */
+    public getValue<T>(type: Type<T>): T
+    public getValue(type: null): any
     public getValue(type: Type | null) {
         if (this.deserializer) {
             if (type != null) {
@@ -62,6 +64,7 @@ export class DeferredSerializationValue {
     ) { }
 
     /** Use this to prepare for serialization of values with known types */
+    public static prepareSerialization<T>(value: T, type: Type<T>): DeferredSerializationValue
     public static prepareSerialization(value: any, type: Type) {
         return new DeferredSerializationValue(value, type, null)
     }
