@@ -1060,7 +1060,11 @@ export namespace Type {
      * Creates a type definition that represents a TypeScript union of objects, which is discriminated by a key property.
      * It is not recommended to use this function, instead design your types to use {@link PolymorphicSerializer}.
      * */
-    export const byKeyUnion = <T, K extends keyof T>(name: string, key: K, lookup: Record<_Extract<T[K], string>, T extends infer U ? Type<U> : never>, defaultFactory: () => T | null) => {
+    export function byKeyUnion<T, K extends keyof T>(name: string, key: K, lookup: Record<_Extract<T[K], string>, T extends infer U ? Type<U> : never>): Type<T>
+    export function byKeyUnion<T, K extends keyof T>(name: string, key: K, lookup: Record<_Extract<T[K], string>, T extends infer U ? Type<U> : never>, defaultFactory: () => T | null): Type<T>
+    export function byKeyUnion<T, K extends keyof T>(name: string, key: K, lookup: Record<_Extract<T[K], string>, T extends infer U ? Type<U> : never>, defaultFactory?: () => T | null) {
+        defaultFactory ??= () => null
+
         const _lookup = new Map(Object.entries(lookup)) as Map<string, Type>
         return new class extends Type<T> {
             public readonly name = name
@@ -1070,7 +1074,7 @@ export namespace Type {
             }
 
             public default(): T {
-                return defaultFactory()!
+                return defaultFactory!()!
             }
 
             protected _serialize(source: T, serializer: Serializer): unknown {
