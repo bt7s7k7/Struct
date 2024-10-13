@@ -353,12 +353,12 @@ export namespace Type {
         protected _deserialize(handle: any, deserializer: Deserializer) {
             const source = deserializer.parseAtom(handle)
             if (typeof source != this._typeof) throw new DeserializationError("Expected " + this.name)
-            return source as T
+            return source as any as T
         }
 
         public verify(value: unknown) {
             if (typeof value != this._typeof) throw new DeserializationError("Expected " + this.name)
-            return value as T
+            return value as any as T
         }
 
         constructor(
@@ -395,12 +395,12 @@ export namespace Type {
         protected _deserialize(handle: any, deserializer: Deserializer) {
             const source = deserializer.parsePrimitive(handle)
             if (typeof source != this._typeof) throw new DeserializationError("Expected " + this.name)
-            return source as T
+            return source as any as T
         }
 
         public verify(value: unknown) {
             if (typeof value != this._typeof) throw new DeserializationError("Expected " + this.name)
-            return value as T
+            return value as any as T
         }
         constructor(
             public readonly name: string,
@@ -1050,8 +1050,8 @@ export namespace Type {
                 const id = (value as any)[key]
                 const expected = typeof lookup == "function" ? lookup(id) : lookup.get(id)
                 if (expected == null) throw new DeserializationError(`Invalid ${name} ${key.toString()} "${id}"`)
-                if (expected != value) throw new DeserializationError(`Invalid ${name} ${id}, ${key.toString()} matches but the value does not equal`)
-                return value as T
+                if (expected != value as any) throw new DeserializationError(`Invalid ${name} ${id}, ${key.toString()} matches but the value does not equal`)
+                return value as any as T
             }
         } as Type<T>
     }
