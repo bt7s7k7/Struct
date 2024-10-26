@@ -59,6 +59,10 @@ export namespace Struct {
      *     name: Type.string
      * }) {}
      * */
+    export function define<T extends Record<string, Type<any>>>(name: string, props: T): StructStatics<Type.TypedObjectType<T>, InstanceType<typeof Object>>
+    export function define<T extends Record<string, Type<any>>>(name: string, props: T, base: undefined): StructStatics<Type.TypedObjectType<T>, InstanceType<typeof Object>>
+    export function define<T extends Record<string, Type<any>>>(name: string, props: T, base: undefined, options: StructDefineOptions): StructStatics<Type.TypedObjectType<T>, InstanceType<typeof Object>>
+    export function define<T extends Record<string, Type<any>>, B extends abstract new () => any = typeof Object>(name: string, props: T, base: B, options?: StructDefineOptions): StructStatics<Type.TypedObjectType<T>, InstanceType<B>>
     export function define<T extends Record<string, Type<any>>, B extends abstract new () => any = typeof Object>(name: string, props: T, base?: B, options?: StructDefineOptions): StructStatics<Type.TypedObjectType<T>, InstanceType<B>> {
         let objectType: Type.ObjectType = Type.namedType(name, props)
         if (options?.baseTypeDecorator) {
