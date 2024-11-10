@@ -1,19 +1,19 @@
 module.exports = {
     root: true,
     env: {
-        node: true
+        node: true,
     },
     extends: [
         "eslint:recommended",
         "plugin:@typescript-eslint/eslint-recommended",
-        "plugin:@typescript-eslint/recommended"
+        "plugin:@typescript-eslint/recommended",
     ],
     parser: "@typescript-eslint/parser",
     plugins: [
-        "@typescript-eslint"
+        "@typescript-eslint",
     ],
     parserOptions: {
-        ecmaVersion: 2020
+        ecmaVersion: 2020,
     },
     rules: {
         "no-console": "warn",
@@ -22,22 +22,31 @@ module.exports = {
         "semi": ["warn", "never"],
         "prefer-rest-params": "off",
         "quotes": ["warn", "double", { "allowTemplateLiterals": true }],
+        "comma-dangle": ["warn", "always-multiline"],
+        "no-inner-declarations": "off",
+        "no-constant-condition": "off",
+        "no-control-regex": "off",
         "@typescript-eslint/no-unused-vars": "off",
         "@typescript-eslint/triple-slash-reference": "off",
         "@typescript-eslint/no-var-requires": "off",
         "@typescript-eslint/explicit-module-boundary-types": "off",
         "@typescript-eslint/no-non-null-assertion": "off",
+        "@typescript-eslint/no-non-null-asserted-optional-chain": "off",
         "@typescript-eslint/no-namespace": "off",
         "@typescript-eslint/no-explicit-any": "off",
         "@typescript-eslint/no-empty-function": "off",
         "@typescript-eslint/ban-ts-comment": "off",
         "@typescript-eslint/no-empty-interface": "off",
-        "@typescript-eslint/ban-types": "off"
+        "@typescript-eslint/ban-types": "off",
+        "@typescript-eslint/no-this-alias": "off",
+        "@typescript-eslint/no-empty-object-type": "off",
+        "@typescript-eslint/no-require-imports": "off",
+        "@typescript-eslint/no-unused-expressions": "off",
     },
     ignorePatterns: [
         "/node_modules",
         "/build",
         "/dist",
         "/ucpem_ports",
-    ]
+    ],
 }

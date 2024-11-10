@@ -6,7 +6,7 @@ const DRY_MUTATION = Symbol.for("struct.rawMutation")
 const _MUTATION_PROPS = {
     path: Type.string.as(Type.array),
     type: Type.passthrough<Type>().as(Type.nullable),
-    deserializer: Type.passthrough<Deserializer>().as(Type.nullable)
+    deserializer: Type.passthrough<Deserializer>().as(Type.nullable),
 }
 
 // Mutation serialization uses a custom type to support two workflows. In the typed workflow a type is
@@ -139,7 +139,7 @@ export namespace Mutation {
     export class AssignMutation extends Struct.define("AssignMutation", {
         ..._MUTATION_PROPS,
         key: Type.string,
-        value: Type.any
+        value: Type.any,
     }, _Mutation, { baseTypeDecorator: _MUTATION_TYPE }) {
         public readonly kind = "assign"
 
@@ -163,7 +163,7 @@ export namespace Mutation {
         ..._MUTATION_PROPS,
         index: Type.number,
         deleteCount: Type.number,
-        items: Type.any.as(Type.array)
+        items: Type.any.as(Type.array),
     }, _Mutation, { baseTypeDecorator: _MUTATION_TYPE }) {
         public readonly kind = "splice"
 
@@ -238,7 +238,7 @@ export namespace Mutation {
 
                 mutations.push(new AssignMutation({
                     value, path, key,
-                    type: propertyType
+                    type: propertyType,
                 }))
 
                 return true
@@ -278,7 +278,7 @@ export namespace Mutation {
                             mutations.push(new SpliceMutation({
                                 deleteCount, path, items,
                                 index: start,
-                                type: elementType
+                                type: elementType,
                             }))
 
                             if (target != DRY_MUTATION) target.splice(start, deleteCount, ...items)
@@ -308,7 +308,7 @@ export namespace Mutation {
                         return function mapSet(key: string, value: any) {
                             mutations.push(new AssignMutation({
                                 path, key, value,
-                                type: valueType
+                                type: valueType,
                             }))
 
                             if (target != DRY_MUTATION) target.set(key, value)
@@ -354,7 +354,7 @@ export namespace Mutation {
                 const propertyType = objectType == null ? null : objectType.props[key]
 
                 return _makeProxy(target != DRY_MUTATION ? Reflect.get(target, key, receiver) : DRY_MUTATION, propertyType, [...path, key], mutations)
-            }
+            },
         })
     }
 

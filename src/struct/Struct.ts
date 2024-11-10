@@ -154,7 +154,7 @@ export namespace Struct {
 
         constructor(
             public readonly name: string,
-            public readonly types: Map<string, Type<any>>
+            public readonly types: Map<string, Type<any>>,
         ) { super() }
     }
 
@@ -197,7 +197,7 @@ export namespace Struct {
         }
 
         constructor(
-            public readonly name: string
+            public readonly name: string,
         ) { }
     }
 
@@ -229,7 +229,7 @@ export namespace Struct {
 
         constructor(
             public readonly name: string,
-            public readonly contextGetter: (id: string) => any
+            public readonly contextGetter: (id: string) => any,
         ) { super() }
     }
 
@@ -373,7 +373,7 @@ export namespace Struct {
         }
 
         constructor(
-            name: string
+            name: string,
         ) { super(name) }
     }
 }

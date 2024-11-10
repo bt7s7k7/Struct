@@ -22,7 +22,7 @@ export class DeserializationError extends Error {
     protected readonly _oldStack: string
 
     constructor(
-        protected readonly _message: string
+        protected readonly _message: string,
     ) {
         super("__MSG")
 
@@ -172,7 +172,7 @@ export class PlainObjectDeserializer extends Deserializer<any, Record<string, an
     }
 
     constructor(
-        public readonly root: any
+        public readonly root: any,
     ) { super() }
 }
 
@@ -222,7 +222,7 @@ class _CloneDeserializer extends Deserializer<any, Record<string, any>, any[], M
     }
 
     constructor(
-        public readonly root: any
+        public readonly root: any,
     ) { super() }
 }
 
@@ -363,7 +363,7 @@ export namespace Type {
 
         constructor(
             public readonly name: string,
-            protected readonly _default: T
+            protected readonly _default: T,
         ) { super() }
     }
 
@@ -404,7 +404,7 @@ export namespace Type {
         }
         constructor(
             public readonly name: string,
-            protected readonly _default: T
+            protected readonly _default: T,
         ) { super() }
     }
 
@@ -498,7 +498,7 @@ export namespace Type {
         }
 
         constructor(
-            public readonly elementType: Type<T>
+            public readonly elementType: Type<T>,
         ) { super() }
     }
 
@@ -599,7 +599,7 @@ export namespace Type {
 
         constructor(
             public readonly keyType: Type<K>,
-            public readonly valueType: Type<V>
+            public readonly valueType: Type<V>,
         ) { super() }
     }
 
@@ -774,7 +774,7 @@ export namespace Type {
 
         constructor(
             public readonly name: string,
-            public readonly props: Record<string, Type>
+            public readonly props: Record<string, Type>,
         ) { super() }
     }
 
@@ -782,7 +782,7 @@ export namespace Type {
     export class TypedObjectType<T extends Record<string, Type>> extends ObjectType<Type.ResolveObjectType<T>> {
         constructor(
             name: string,
-            public readonly props: T
+            public readonly props: T,
         ) { super(name, props) }
     }
 
@@ -860,7 +860,7 @@ export namespace Type {
 
         constructor(
             public readonly base: Type<T>,
-            public readonly skipNullSerialize: boolean
+            public readonly skipNullSerialize: boolean,
         ) { super() }
     }
     /** Creates a definition of a nullable value from the provided base type. When `skipNullSerialize` is set, objects will not store this value if it is `null`. */
@@ -898,7 +898,7 @@ export namespace Type {
 
         constructor(
             public readonly base: Type<T>,
-            public readonly defaultFactory: (() => T) | null
+            public readonly defaultFactory: (() => T) | null,
         ) { super() }
     }
     /** 
@@ -943,7 +943,7 @@ export namespace Type {
 
         constructor(
             public readonly name: string,
-            public readonly defaultFactory: () => T
+            public readonly defaultFactory: () => T,
         ) { super() }
     }
 
@@ -1010,7 +1010,7 @@ export namespace Type {
         }
 
         constructor(
-            public readonly entries: readonly T[]
+            public readonly entries: readonly T[],
         ) { super() }
     }
 

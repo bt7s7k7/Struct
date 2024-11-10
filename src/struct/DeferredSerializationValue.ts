@@ -60,7 +60,7 @@ export class DeferredSerializationValue {
     protected constructor(
         public readonly value: any,
         public readonly type: Type | null,
-        public readonly deserializer: Deserializer | null
+        public readonly deserializer: Deserializer | null,
     ) { }
 
     /** Use this to prepare for serialization of values with known types */
