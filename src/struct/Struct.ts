@@ -149,7 +149,12 @@ export namespace Struct {
             const type = this.types.get(typeID)
             if (type == null) throw new DeserializationError(`Cannot find type "${typeID}"`)
 
-            return type["_deserialize"](handle, deserializer)
+            try {
+                return type["_deserialize"](handle, deserializer)
+            } catch (err) {
+                if (err instanceof DeserializationError) err.appendPath(`(${typeID})`)
+                throw err
+            }
         }
 
         constructor(
