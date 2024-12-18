@@ -299,6 +299,19 @@ export abstract class Type<T = any> {
     /** Verifies that the value matches the specified type information. If there is a mismatch an error is thrown. */
     public abstract verify(value: unknown): T
 
+    public matches(value: unknown): value is T {
+        try {
+            this.verify(value)
+            return true
+        } catch (err) {
+            if (err instanceof DeserializationError) {
+                return false
+            }
+
+            throw err
+        }
+    }
+
     protected abstract _serialize(source: T, serializer: Serializer): unknown
     protected abstract _deserialize(handle: any, deserializer: Deserializer): T
 }
