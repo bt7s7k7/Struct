@@ -94,6 +94,7 @@ export class PlainObjectSerializer extends Serializer<any> {
     }
 
     public addObjectProperty(handle: any, key: string, value: any) {
+        if (value == Type.IGNORE_VALUE) return
         handle[key] = value
     }
 
@@ -102,6 +103,7 @@ export class PlainObjectSerializer extends Serializer<any> {
     }
 
     public addArrayElement(handle: any[], value: any) {
+        if (value == Type.IGNORE_VALUE) return
         handle.push(value)
     }
 
@@ -110,10 +112,12 @@ export class PlainObjectSerializer extends Serializer<any> {
     }
 
     public addMapProperty(handle: any, key: any, value: any) {
+        if (value == Type.IGNORE_VALUE) return
         handle[key] = value
     }
 
     public finish(root: any): any {
+        if (root == Type.IGNORE_VALUE) return null
         return root
     }
 }
@@ -303,7 +307,7 @@ export abstract class Type<T = any> {
         try {
             this.verify(value)
             return true
-        } catch (err) {
+        } catch (err: any) {
             if (err instanceof DeserializationError) {
                 return false
             }
@@ -318,6 +322,9 @@ export abstract class Type<T = any> {
 
 
 export namespace Type {
+    /** Return this value from {@link Type#_serialize} to be skipped during serialization */
+    export const IGNORE_VALUE = Symbol.for("struct.ignore")
+
     /** Gets instance value of a type definition */
     export type Extract<T extends Type> = T extends Type<infer U> ? U : never
 
@@ -479,7 +486,7 @@ export namespace Type {
 
                 try {
                     deserializedValue = this.elementType["_deserialize"](value, deserializer)
-                } catch (err) {
+                } catch (err: any) {
                     if (err instanceof DeserializationError) {
                         err.appendPath(index.toString())
                     }
@@ -487,6 +494,7 @@ export namespace Type {
                     throw err
                 }
 
+                if (deserializedValue == IGNORE_VALUE) continue
                 result.push(deserializedValue)
             }
 
@@ -501,7 +509,7 @@ export namespace Type {
                 index++
                 try {
                     this.elementType.verify(element)
-                } catch (err) {
+                } catch (err: any) {
                     if (err instanceof DeserializationError) err.appendPath(index.toString())
                     throw err
                 }
@@ -562,7 +570,7 @@ export namespace Type {
 
                 try {
                     deserializedKey = this.keyType["_deserialize"](key, deserializer)
-                } catch (err) {
+                } catch (err: any) {
                     if (err instanceof DeserializationError) {
                         err.appendPath(index.toString())
                     }
@@ -572,7 +580,7 @@ export namespace Type {
 
                 try {
                     deserializedValue = this.valueType["_deserialize"](value, deserializer)
-                } catch (err) {
+                } catch (err: any) {
                     if (err instanceof DeserializationError) {
                         err.appendPath(deserializedKey.toString())
                     }
@@ -580,6 +588,7 @@ export namespace Type {
                     throw err
                 }
 
+                if (deserializedValue == IGNORE_VALUE) continue
                 result.set(deserializedKey, deserializedValue)
             }
 
@@ -594,14 +603,14 @@ export namespace Type {
                 index++
                 try {
                     this.keyType.verify(key)
-                } catch (err) {
+                } catch (err: any) {
                     if (err instanceof DeserializationError) err.appendPath(index.toString())
                     throw err
                 }
 
                 try {
                     this.valueType.verify(element)
-                } catch (err) {
+                } catch (err: any) {
                     if (err instanceof DeserializationError) err.appendPath(key.toString())
                     throw err
                 }
@@ -682,10 +691,6 @@ export namespace Type {
             for (const [key, type] of this.propList) {
                 const value = (source as any)[key]
 
-                if (Type.isNullable(type) && type.skipNullSerialize && value == null) {
-                    continue
-                }
-
                 const valueHandle = type["_serialize"](value, serializer)
                 serializer.addObjectProperty(handle, key, valueHandle)
             }
@@ -715,7 +720,7 @@ export namespace Type {
                 } else {
                     try {
                         sourceVersion = number["_deserialize"](sourceVersionHandle, deserializer)
-                    } catch (err) {
+                    } catch (err: any) {
                         if (err instanceof DeserializationError) err.appendPath("!version")
                         throw err
                     }
@@ -753,12 +758,14 @@ export namespace Type {
                 let value: any
                 try {
                     value = type["_deserialize"](valueHandle, deserializer)
-                } catch (err) {
+                } catch (err: any) {
                     if (err instanceof DeserializationError) {
                         err.appendPath(key)
                     }
                     throw err
                 }
+
+                if (value == IGNORE_VALUE) continue
                 (receiver as any)[key] = value
             }
         }
@@ -776,7 +783,7 @@ export namespace Type {
             for (const [key, type] of this.propList) {
                 try {
                     type.verify((value as Record<string, any>)[key])
-                } catch (err) {
+                } catch (err: any) {
                     if (err instanceof DeserializationError) err.appendPath(key)
                     throw err
                 }
@@ -789,6 +796,56 @@ export namespace Type {
             public readonly name: string,
             public readonly props: Record<string, Type>,
         ) { super() }
+    }
+
+    export class LazyObjectType<T extends object> extends ObjectType<T> {
+        protected _getter
+
+        constructor(
+            name: string,
+            _getter: () => Record<string, Type<any>>
+        ) {
+            super(name, {})
+
+            this._getter = _getter as typeof _getter | null
+
+            Object.defineProperty(this, "props", {
+                configurable: true,
+                enumerable: true,
+                get: () => {
+                    if (this._getter == null) throw new Error("Tried to compute props on a LazyObjectType, but the getter was already set to null")
+
+                    const props = this._getter()
+                    this._getter = null
+
+                    Object.defineProperty(this, "props", {
+                        value: props,
+                        enumerable: true,
+                        configurable: true,
+                        writable: true
+                    })
+
+                    return props
+                },
+            })
+
+            Object.defineProperty(this, "propList", {
+                configurable: true,
+                enumerable: true,
+                get: () => {
+                    const propList = Object.entries(this.props)
+
+                    Object.defineProperty(this, "propList", {
+                        value: propList,
+                        enumerable: true,
+                        configurable: true,
+                        writable: true
+                    })
+
+                    return propList
+                },
+            })
+        }
     }
 
     /** Type definition for objects with statically known properties, see {@link Type.ObjectType}. Do not use this class directly, instead use {@link Type.object} or {@link Type.objectWithClass}. */
@@ -804,6 +861,9 @@ export namespace Type {
 
     /** Creates a definition of an object from the provided record of properties. */
     export function namedType<T extends Record<string, Type>>(name: string, props: T) { return new TypedObjectType(name, props) }
+
+    /** Creates a definition of an object from the provided record of properties. */
+    export function lazyNamedType<T extends Record<string, Type>>(name: string, props: () => Record<string, Type<any>>) { return new LazyObjectType<T>(name, props) }
 
     /** Creates a definition of an object from the provided record of properties and a specified constructor. There is not test if the specified properties match the specified class. */
     export function objectWithClass<T extends object>(ctor: new () => T, name: string, props: Record<string, Type>): ObjectType<T> {
@@ -854,6 +914,7 @@ export namespace Type {
         }
         protected _serialize(source: T | null, serializer: Serializer) {
             if (source == null) {
+                if (this.skipNullSerialize) return IGNORE_VALUE
                 return serializer.createNull()
             }
 
@@ -1048,7 +1109,7 @@ export namespace Type {
                 let id: string
                 try {
                     id = string["_deserialize"](handle, deserializer)
-                } catch (err) {
+                } catch (err: any) {
                     if (err instanceof DeserializationError) throw new DeserializationError("Expected " + this.name)
                     throw err
                 }
@@ -1105,7 +1166,7 @@ export namespace Type {
                 let id: string
                 try {
                     id = string["_deserialize"](keyHandle, deserializer)
-                } catch (err) {
+                } catch (err: any) {
                     if (err instanceof DeserializationError) err.appendPath(key.toString())
                     throw err
                 }

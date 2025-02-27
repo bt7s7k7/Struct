@@ -6,10 +6,10 @@ type AllowVoidIfAllNullable<T> = Exclude<keyof T, NullableKeys<T>> extends never
 type ClassCtor = abstract new () => any
 
 export namespace Struct {
-    export function getBaseType(struct: any): Type<any> {
-        if (Type.isType(struct)) return struct
+    export function getBaseType(struct: any): Type.ObjectType<any> {
+        if (Type.isType(struct)) return struct as Type.ObjectType
 
-        const type = getType(struct)
+        const type = getType(struct) as Type.ObjectType
         if (type == null) throw new Error("Cannot get base type, because the value is not a struct instance")
         return "baseType" in type ? (type as unknown as StructStatics).baseType as never : type
     }
@@ -33,9 +33,13 @@ export namespace Struct {
         serialize(): any
     }
 
+    export type _ExcludeDecoratorFields<T> = {
+        [P in keyof T as T[P] extends { [DECORATOR_FIELD]: any } ? never : P]: T[P]
+    }
+
     /** All static properties on a struct */
-    export interface StructStatics<T extends Type = Type, B = {}> {
-        new(source: AllowVoidIfAllNullable<ReturnType<T["default"]>>): StructBase & ReturnType<T["default"]> & B
+    export interface StructStatics<TBaseType extends Type.ObjectType = Type.ObjectType, TBaseClass = {}> {
+        new(source: AllowVoidIfAllNullable<_ExcludeDecoratorFields<ReturnType<TBaseType["default"]>>>): StructBase & ReturnType<TBaseType["default"]> & TBaseClass
         /** Creates a default instance of this struct. Short for `this.ref().default()` */
         default<T extends { new(...args: any): any }>(this: T): InstanceType<T>
         /** Deserializes an instance of this struct. Short for `this.ref().deserialize(source)` */
@@ -43,13 +47,81 @@ export namespace Struct {
         /** Returns the type definition of this struct. */
         ref<T extends { new(...args: any): any }>(this: T): Type.ObjectType<InstanceType<T>>
         /** Base type that this struct type definition derives from. Use this to define migrations, but make sure to do it before calling {@link ref}. */
-        readonly baseType: T
+        readonly baseType: TBaseType
     }
 
     /** Options for {@link Struct.define} */
     export interface StructDefineOptions {
-        /** Allow you to replace the type definition used as a base the struct. The returned value is then derived, using {@link Type.derive}, for every class inheriting the struct. */
+        /** Allow you to replace the type definition used as a base the struct. The returned value is then derived, using {@link Type#derive}, for every class inheriting the struct. */
         baseTypeDecorator?: (type: Type.ObjectType) => Type.ObjectType
+    }
+
+    type _FieldClassCtor = { new(): any }
+    type _PropsConstraint = Record<string, Type<any>> | _FieldClassCtor
+
+    type _StructResult<TProps extends _PropsConstraint, TBaseClass> = TProps extends _FieldClassCtor ? (
+        StructStatics<Type.LazyObjectType<InstanceType<TProps>>, TBaseClass>
+    ) : TProps extends Record<string, Type<any>> ? (
+        StructStatics<Type.TypedObjectType<TProps>, TBaseClass>
+    ) : never
+
+    class _StructPropertyResolver {
+        protected _props: Record<string, Type<any>> | null = null
+        protected _defaultFields: Record<string, any> | null = null
+
+        public getProps = () => {
+            if (this._props != null) return this._props
+            if (typeof this._source != "function") {
+                this._defaultFields = Object.fromEntries(Object.keys(this._source).map(v => [v, null]))
+                this._props = this._source
+                // @ts-ignore This cleanup is only to save memory since this property will never be accessed again
+                this._source = null
+                return this._props
+            }
+
+            const props: Record<string, Type<any>> = {}
+
+            // Because the instance fields are populated from the user supplied source parameter, the order
+            // of the specified fields may be different which can result in class instances having different
+            // internal types assigned by the JavaScript VM. Therefore, we create all instance properties
+            // without a value in a uniform order and then assign their values.
+            const defaultFields: Record<string, any> = {}
+
+            const instance = new this._source()
+            for (const [key, value] of Object.entries(instance)) {
+                if (value instanceof FieldInfo) {
+                    props[key] = value.type
+                    if (DECORATOR_FIELD in value.type) continue
+                    defaultFields[key] = null
+                    continue
+                }
+            }
+
+            this._props = props
+            this._defaultFields = defaultFields
+
+            // @ts-ignore This cleanup is only to save memory since this property will never be accessed again
+            this._source = null
+
+            return this._props
+        }
+
+        public getObjectType(): Type.ObjectType {
+            if (typeof this._source == "function") {
+                return new Type.LazyObjectType(this.name, this.getProps)
+            } else {
+                return new Type.TypedObjectType(this.name, this.getProps())
+            }
+        }
+
+        public getDefaultFields() {
+            return this._defaultFields ?? (this.getProps(), this._defaultFields!)
+        }
+
+        constructor(
+            public readonly name: string,
+            protected _source: _PropsConstraint
+        ) { }
     }
 
     /**
@@ -59,33 +131,29 @@ export namespace Struct {
      *     name: Type.string
      * }) {}
      * */
-    export function define<T extends Record<string, Type<any>>>(name: string, props: T): StructStatics<Type.TypedObjectType<T>, InstanceType<typeof Object>>
-    export function define<T extends Record<string, Type<any>>>(name: string, props: T, base: undefined): StructStatics<Type.TypedObjectType<T>, InstanceType<typeof Object>>
-    export function define<T extends Record<string, Type<any>>>(name: string, props: T, base: undefined, options: StructDefineOptions): StructStatics<Type.TypedObjectType<T>, InstanceType<typeof Object>>
-    export function define<T extends Record<string, Type<any>>, B extends abstract new () => any = typeof Object>(name: string, props: T, base: B, options?: StructDefineOptions): StructStatics<Type.TypedObjectType<T>, InstanceType<B>>
-    export function define<T extends Record<string, Type<any>>, B extends abstract new () => any = typeof Object>(name: string, props: T, base?: B, options?: StructDefineOptions): StructStatics<Type.TypedObjectType<T>, InstanceType<B>> {
-        let objectType: Type.ObjectType = Type.namedType(name, props)
+    export function define<T extends _PropsConstraint>(name: string, props: T): _StructResult<T, InstanceType<new () => {}>>
+    export function define<T extends _PropsConstraint>(name: string, props: T, base: undefined): _StructResult<T, InstanceType<new () => {}>>
+    export function define<T extends _PropsConstraint>(name: string, props: T, base: undefined, options: StructDefineOptions): _StructResult<T, InstanceType<new () => {}>>
+    export function define<T extends _PropsConstraint, B extends abstract new () => any = new () => {}>(name: string, props: T, base: B, options?: StructDefineOptions): _StructResult<T, InstanceType<B>>
+    export function define<T extends _PropsConstraint, B extends abstract new () => any = new () => {}>(name: string, props: T, base?: B, options?: StructDefineOptions): _StructResult<T, InstanceType<B>> {
+        const resolver = new _StructPropertyResolver(name, props)
+        let objectType = resolver.getObjectType()
         if (options?.baseTypeDecorator) {
             objectType = options.baseTypeDecorator(objectType)
         }
 
         const inheritorMap = new Map<any, Type>()
 
-        // Because the instance fields are populated from the user supplied source parameter, the order
-        // of the specified fields may be different which can result in class instances having different
-        // internal types assigned by the JavaScript VM. Therefore, we create all instance properties
-        // without a value in a uniform order and then assign their values.
-
-        const defaultProperties = Object.fromEntries(objectType.propList.map(v => [v[0], null]))
-
         class StructInstance extends (base ?? Object) implements StructBase {
             public serialize<T extends { constructor: any }>(this: T): any {
                 return (this.constructor as typeof StructInstance).ref().serialize(this)
             }
 
-            constructor(source: Type.ResolveObjectType<T>) {
+            constructor(source: any) {
                 super()
-                Object.assign(this, defaultProperties, source ?? {})
+
+                Object.assign(this, resolver.getDefaultFields(), source ?? {})
+
                 if ("_postDeserialize" in this) {
                     (this as any)._postDeserialize()
                 }
@@ -151,7 +219,7 @@ export namespace Struct {
 
             try {
                 return type["_deserialize"](handle, deserializer)
-            } catch (err) {
+            } catch (err: any) {
                 if (err instanceof DeserializationError) err.appendPath(`(${typeID})`)
                 throw err
             }
@@ -291,7 +359,7 @@ export namespace Struct {
 
                         const instance = type.default()
                         cache.set(id, { instance, data, type })
-                    } catch (err) {
+                    } catch (err: any) {
                         if (err instanceof DeserializationError) err.appendPath(index.toString())
                         throw err
                     }
@@ -303,7 +371,7 @@ export namespace Struct {
                     try {
                         Object.assign(instance, Struct.getBaseType(type)["_deserialize"](data, deserializer))
                         if ("_postDeserialize" in instance) (instance as any)._postDeserialize()
-                    } catch (err) {
+                    } catch (err: any) {
                         if (err instanceof DeserializationError) err.appendPath(index.toString())
                         throw err
                     }
@@ -381,4 +449,16 @@ export namespace Struct {
             name: string,
         ) { super(name) }
     }
+
+    export class FieldInfo {
+        constructor(
+            public readonly type: Type<any>
+        ) { }
+    }
+
+    export function field<T>(type: Type<T>): T {
+        return new FieldInfo(type) as T
+    }
+
+    export const DECORATOR_FIELD = Symbol.for("struct.decoratorField")
 }
