@@ -33,6 +33,7 @@ export namespace Struct {
         serialize(): any
     }
 
+    export const DECORATOR_FIELD = Symbol.for("struct.decoratorField")
     export type _ExcludeDecoratorFields<T> = {
         [P in keyof T as T[P] extends { [DECORATOR_FIELD]: any } ? never : P]: T[P]
     }
@@ -459,6 +460,4 @@ export namespace Struct {
     export function field<T>(type: Type<T>): T {
         return new FieldInfo(type) as T
     }
-
-    export const DECORATOR_FIELD = Symbol.for("struct.decoratorField")
 }
