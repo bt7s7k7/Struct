@@ -61,6 +61,7 @@ export abstract class Deserializer<I = unknown, O = unknown, A = unknown, M = un
     public abstract parseAtom(source: I): string | number | boolean
     public abstract isNull(source: I): boolean
     public abstract parseAny(source: I): any
+    public abstract getTypeHint(source: I): "string" | "number" | "boolean" | "object" | "array" | "null"
 
     public abstract parseObject(source: I): O | null
     public abstract getObjectProperty(handle: O, key: string): I
@@ -135,6 +136,20 @@ export class PlainObjectDeserializer extends Deserializer<any, Record<string, an
         return source
     }
 
+    public getTypeHint(source: any): "string" | "number" | "boolean" | "object" | "array" | "null" {
+        if (typeof source == "string") return "string"
+        if (typeof source == "number") return "number"
+        if (typeof source == "boolean") return "boolean"
+        if (source == null) return "null"
+
+        if (typeof source == "object") {
+            if (source instanceof Array) return "array"
+            return "object"
+        }
+
+        throw new TypeError("Cannot get type hint")
+    }
+
     public isNull(source: any): boolean {
         return source == null
     }
@@ -195,6 +210,20 @@ class _CloneDeserializer extends Deserializer<any, Record<string, any>, any[], M
 
     public isNull(source: any): boolean {
         return source == null
+    }
+
+    public getTypeHint(source: any): "string" | "number" | "boolean" | "object" | "array" | "null" {
+        if (typeof source == "string") return "string"
+        if (typeof source == "number") return "number"
+        if (typeof source == "boolean") return "boolean"
+        if (source == null) return "null"
+
+        if (typeof source == "object") {
+            if (source instanceof Array) return "array"
+            return "object"
+        }
+
+        throw new TypeError("Cannot get type hint")
     }
 
     public parseAny(source: any) {
