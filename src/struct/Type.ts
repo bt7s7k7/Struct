@@ -947,11 +947,11 @@ export namespace Type {
     export const isOptional = (type: Type): type is OptionalType<any> => IS_OPTIONAL in type
     /** Type definition for optional values. Do not use this class directly, instead use {@link Type.optional}. */
     export class OptionalType<T> extends Type<T> {
-        public readonly name = this.base.name
+        public readonly name = this.base.name + "?"
         public readonly [IS_OPTIONAL] = true
 
         public getDefinition(indent: string): string {
-            return this.base.getDefinition(indent)
+            return this.base.getDefinition(indent) + "?"
         }
         public default(): T {
             return this.defaultFactory == null ? this.base.default() : this.defaultFactory()
