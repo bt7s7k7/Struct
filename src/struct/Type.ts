@@ -54,6 +54,7 @@ export abstract class Serializer<I = unknown, O = unknown, A = unknown, M = unkn
     public abstract finish(root: I): unknown
 }
 
+export type DeserializerTypeHint = "string" | "number" | "boolean" | "object" | "array" | "null"
 export abstract class Deserializer<I = unknown, O = unknown, A = unknown, M = unknown> {
     public abstract getRootHandle(): I
 
@@ -61,7 +62,7 @@ export abstract class Deserializer<I = unknown, O = unknown, A = unknown, M = un
     public abstract parseAtom(source: I): string | number | boolean
     public abstract isNull(source: I): boolean
     public abstract parseAny(source: I): any
-    public abstract getTypeHint(source: I): "string" | "number" | "boolean" | "object" | "array" | "null"
+    public abstract getTypeHint(source: I): DeserializerTypeHint
 
     public abstract parseObject(source: I): O | null
     public abstract getObjectProperty(handle: O, key: string): I
@@ -832,7 +833,7 @@ export namespace Type {
 
         constructor(
             name: string,
-            _getter: () => Record<string, Type<any>>
+            _getter: (props: Record<string, Type<any>>) => void
         ) {
             super(name, {})
 
@@ -844,15 +845,16 @@ export namespace Type {
                 get: () => {
                     if (this._getter == null) throw new Error("Tried to compute props on a LazyObjectType, but the getter was already set to null")
 
-                    const props = this._getter()
-                    this._getter = null
-
+                    const props = {}
                     Object.defineProperty(this, "props", {
                         value: props,
                         enumerable: true,
                         configurable: true,
                         writable: true
                     })
+
+                    this._getter(props)
+                    this._getter = null
 
                     return props
                 },
@@ -895,14 +897,30 @@ export namespace Type {
     export function lazyNamedType<T extends Record<string, Type>>(name: string, props: () => Record<string, Type<any>>) { return new LazyObjectType<T>(name, props) }
 
     /** Creates a definition of an object from the provided record of properties and a specified constructor. There is not test if the specified properties match the specified class. */
-    export function objectWithClass<T extends object>(ctor: new () => T, name: string, props: Record<string, Type>): ObjectType<T> {
-        return new class ObjectWithClass extends ObjectType<T> {
-            public _makeBase(): T {
-                return new ctor()
-            }
+    export function objectWithClass<T extends object>(ctor: new (...args: any[]) => T, name: string, props: Record<string, Type>, defaultFactory?: () => T): ObjectType<T> {
+        if (defaultFactory) {
+            return new class ObjectWithClass extends ObjectType<T> {
+                public _makeBase(): T {
+                    return new ctor()
+                }
 
-            constructor() {
-                super(name, props)
+                public default(): T {
+                    return defaultFactory()
+                }
+
+                constructor() {
+                    super(name, props)
+                }
+            }
+        } else {
+            return new class ObjectWithClass extends ObjectType<T> {
+                public _makeBase(): T {
+                    return new ctor()
+                }
+
+                constructor() {
+                    super(name, props)
+                }
             }
         }
     }
