@@ -70,17 +70,22 @@ export namespace Struct {
         protected _props: Record<string, Type<any>> | null = null
         protected _defaultFields: Record<string, any> | null = null
 
-        public getProps = () => {
-            if (this._props != null) return this._props
+        public getProps = (props: Record<string, Type<any>>) => {
+            if (this._props != null) {
+                if (props != this._props) {
+                    Object.assign(props, this._props)
+                }
+
+                return this._props
+            }
             if (typeof this._source != "function") {
                 this._defaultFields = Object.fromEntries(Object.keys(this._source).map(v => [v, null]))
-                this._props = this._source
+                Object.assign(props, this._source)
+                this._props = props
                 // @ts-ignore This cleanup is only to save memory since this property will never be accessed again
                 this._source = null
                 return this._props
             }
-
-            const props: Record<string, Type<any>> = {}
 
             // Because the instance fields are populated from the user supplied source parameter, the order
             // of the specified fields may be different which can result in class instances having different
@@ -111,12 +116,13 @@ export namespace Struct {
             if (typeof this._source == "function") {
                 return new Type.LazyObjectType(this.name, this.getProps)
             } else {
-                return new Type.TypedObjectType(this.name, this.getProps())
+                const props = {}
+                return new Type.TypedObjectType(this.name, this.getProps({}))
             }
         }
 
         public getDefaultFields() {
-            return this._defaultFields ?? (this.getProps(), this._defaultFields!)
+            return this._defaultFields ?? (this.getProps({}), this._defaultFields!)
         }
 
         constructor(
