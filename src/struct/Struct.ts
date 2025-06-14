@@ -55,6 +55,7 @@ export namespace Struct {
     export interface StructDefineOptions {
         /** Allow you to replace the type definition used as a base the struct. The returned value is then derived, using {@link Type#derive}, for every class inheriting the struct. */
         baseTypeDecorator?: (type: Type.ObjectType) => Type.ObjectType
+        instanceDecorator?: (instance: object) => object
     }
 
     type _FieldClassCtor = { new(): any }
@@ -148,6 +149,7 @@ export namespace Struct {
         if (options?.baseTypeDecorator) {
             objectType = options.baseTypeDecorator(objectType)
         }
+        const instanceDecorator = options?.instanceDecorator
 
         const inheritorMap = new Map<any, Type>()
 
@@ -163,6 +165,10 @@ export namespace Struct {
 
                 if ("_postDeserialize" in this) {
                     (this as any)._postDeserialize()
+                }
+
+                if (instanceDecorator) {
+                    return instanceDecorator(this) as this
                 }
             }
 
