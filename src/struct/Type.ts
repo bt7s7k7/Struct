@@ -300,7 +300,7 @@ export abstract class Type<T = any> {
      * you can provide a custom prototype.
      * */
     public derive(prototype = Object.getPrototypeOf(this)): this {
-        return Object.assign(Object.create(prototype), this)
+        return Object.create(prototype, Object.getOwnPropertyDescriptors(this))
     }
 
     /** Creates a copy of this type with the specified metadata added. Get all metadata using {@link Type#getMetadata}. */
