@@ -1245,6 +1245,115 @@ export namespace Type {
 
         return type.derive(TypeWithDefault.prototype)
     }
+
+    export class IdentityIndexedArrayType<T> extends Type<Set<T>> {
+        public readonly name = "IndexedArray<" + this.elementType.name + ">"
+        protected readonly _backingType = this.elementType.as(array)
+
+        public getDefinition(indent: string): string {
+            return indent + "IndexedArray<" + this.elementType.definition + ">"
+        }
+
+        public default(): Set<T> {
+            return new Set()
+        }
+
+        public verify(value: unknown): Set<T> {
+            if (typeof value != "object" || value == null || !(value instanceof Set)) throw new DeserializationError("Expected " + this.definition)
+
+            let index = -1
+            for (const element of value) {
+                index++
+
+                try {
+                    this.elementType.verify(element)
+                } catch (err: any) {
+                    if (err instanceof DeserializationError) err.appendPath(index.toString())
+                    throw err
+                }
+            }
+
+            return value
+        }
+
+        protected _serialize(source: Set<T>, serializer: Serializer): unknown {
+            return this._backingType["_serialize"](Array.from(source), serializer)
+        }
+
+        protected _deserialize(handle: any, deserializer: Deserializer): Set<T> {
+            const values = this._backingType["_deserialize"](handle, deserializer)
+            return new Set(values)
+        }
+
+        constructor(
+            public readonly elementType: Type<T>
+        ) { super() }
+    }
+
+    export class IndexedArrayType<K, T> extends Type<Map<K, T>> {
+        public readonly name = "IndexedArray<" + this.elementType.name + ">"
+        protected readonly _backingType = this.elementType.as(array)
+
+        public getDefinition(indent: string): string {
+            return indent + "IndexedArray<" + this.elementType.definition + ">"
+        }
+
+        public default(): Map<K, T> {
+            return new Map()
+        }
+
+        public verify(value: unknown): Map<K, T> {
+            if (typeof value != "object" || value == null || !(value instanceof Map)) throw new DeserializationError("Expected " + this.definition)
+
+            let index = -1
+            for (const [key, element] of value) {
+                index++
+                if (key != this.getter(element)) {
+                    const err = new DeserializationError("Invalid key for element")
+                    err.appendPath(index.toString())
+                    throw err
+                }
+
+                try {
+                    this.elementType.verify(element)
+                } catch (err: any) {
+                    if (err instanceof DeserializationError) err.appendPath(index.toString())
+                    throw err
+                }
+            }
+
+            return value
+        }
+
+        protected _serialize(source: Map<K, T>, serializer: Serializer): unknown {
+            return this._backingType["_serialize"](Array.from(source.values()), serializer)
+        }
+
+        protected _deserialize(handle: any, deserializer: Deserializer): Map<K, T> {
+            const values = this._backingType["_deserialize"](handle, deserializer)
+            return new Map(values.map(v => [this.getter(v), v]))
+        }
+
+        constructor(
+            public readonly getter: (value: T) => K,
+            public readonly elementType: Type<T>
+        ) { super() }
+    }
+
+    /** Creates a definition of an indexed array that indexes values by themselves and therefore can only contain each value once. */
+    export function identityIndexedArray<T>(element: Type<T>): IdentityIndexedArrayType<T> {
+        return new IdentityIndexedArrayType(element)
+    }
+
+    /** Creates a definition of an indexed array that indexes values by a value of their property. */
+    export function keyIndexedArray<T, K extends keyof T>(element: Type<T>, key: K): IndexedArrayType<T[K], T> {
+        return new IndexedArrayType(v => v[key], element)
+    }
+
+    /** Creates a definition of an indexed array that use a computed index. */
+    export function computedIndexedArray<T, TKey>(element: Type<T>, key: (value: T) => TKey): IndexedArrayType<TKey, T> {
+        return new IndexedArrayType(key, element)
+    }
 }
 
 /**
